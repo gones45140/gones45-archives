@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       ligue:
-        description: 'Une ligue (fra.1, nhl…) ou « toutes »'
+        description: 'Une ou plusieurs ligues séparées par des virgules (fra.1,nhl…) ou « toutes »'
         required: false
         default: 'toutes'
 permissions:
@@ -19,9 +19,9 @@ jobs:
       - id: l
         run: |
           if [ "${{ inputs.ligue }}" = "toutes" ] || [ -z "${{ inputs.ligue }}" ]; then
-            echo 'ligues=["fra.1","eng.1","esp.1","ita.1","ger.1","uefa.champions","uefa.europa","uefa.europa.conf","nhl","nba","nfl"]' >> "$GITHUB_OUTPUT"
+            echo 'ligues=["fra.1","eng.1","esp.1","ita.1","ger.1","uefa.champions","uefa.europa","uefa.europa.conf","nhl","nba","nfl","mlb","ned.1","por.1","fra.2","bra.1","arg.1","fifa.friendly","uefa.nations","fifa.worldq.uefa","fifa.world","uefa.euro"]' >> "$GITHUB_OUTPUT"
           else
-            echo "ligues=[\"${{ inputs.ligue }}\"]" >> "$GITHUB_OUTPUT"
+            echo "ligues=$(echo '${{ inputs.ligue }}' | tr -d ' ' | awk -F, '{printf "["; for(i=1;i<=NF;i++){printf "%s\"%s\"", (i>1?",":""), $i}; printf "]"}')" >> "$GITHUB_OUTPUT"
           fi
   rattrapage:
     needs: liste

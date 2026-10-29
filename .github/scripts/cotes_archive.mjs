@@ -10,8 +10,13 @@ import fs from 'node:fs';
 const LIGUES = [
   ['soccer', 'fra.1'], ['soccer', 'eng.1'], ['soccer', 'esp.1'], ['soccer', 'ita.1'], ['soccer', 'ger.1'],
   ['soccer', 'uefa.champions'], ['soccer', 'uefa.europa'], ['soccer', 'uefa.europa.conf'],
-  ['hockey', 'nhl'], ['basketball', 'nba'], ['football', 'nfl']
+  ['hockey', 'nhl'], ['basketball', 'nba'], ['football', 'nfl'],
+  // 20261031d (« il manque rien ? » → ligues ESPN du mur d'Antoine : Dodgers, PSV, Palmeiras, Boca, France… « ok ») :
+  ['baseball', 'mlb'], ['soccer', 'ned.1'], ['soccer', 'por.1'], ['soccer', 'fra.2'], ['soccer', 'bra.1'], ['soccer', 'arg.1'],
+  ['soccer', 'fifa.friendly'], ['soccer', 'uefa.nations'], ['soccer', 'fifa.worldq.uefa'], ['soccer', 'fifa.world'], ['soccer', 'uefa.euro']
 ];
+// saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
+const CIVIL = new Set(['mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
 // types propBets gardés (sondés par Antoine, 30/10) : joueurs + buts d'équipe + les deux marquent
 const TYPES = new Set(['230', '39', '40', '219', '218', '232', '264', '31', '32', '33', '220', '221', '225', '226', '227', '327', '151', '253', '152']);
 const FENETRE = 4 * 3600e3;
@@ -19,11 +24,11 @@ const FENETRE = 4 * 3600e3;
 // 20261031b (« vu qu'on fait tous les sports, faut classer par sport, championnat, équipe / joueur ») : rangement
 // cotes/<sport>/<ligue>/<saison>/matchs/AAAA-MM.json + index recalculés à chaque passage : equipes.json, equipes/<id>.json (matchs de l'équipe),
 // joueurs.json, joueurs/<idEspn>.json (historique du joueur : stats de la feuille + cotes gardées). Ancien rangement cotes/<ligue>/ migré.
-const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us' };
+const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us', baseball: 'baseball' };
 const BASE = (sp, lg) => `cotes/${SPN[sp]}/${lg}`;
 // 20261031c (« ça sera classé par saison ? ») : saison = juillet → juin pour tous les sports (2026-27 = 07/2026 → 06/2027, NFL comprise)
-const SAISON = (mo) => { const y = +mo.slice(0, 4), m = +mo.slice(5, 7); return m >= 7 ? y + '-' + String(y + 1).slice(2) : (y - 1) + '-' + String(y).slice(2); };
-const FMOIS = (sp, lg, mo) => `${BASE(sp, lg)}/${SAISON(mo)}/matchs/${mo}.json`;
+const SAISON = (mo, lg) => { if (CIVIL.has(lg)) return mo.slice(0, 4); const y = +mo.slice(0, 4), m = +mo.slice(5, 7); return m >= 7 ? y + '-' + String(y + 1).slice(2) : (y - 1) + '-' + String(y).slice(2); };
+const FMOIS = (sp, lg, mo) => `${BASE(sp, lg)}/${SAISON(mo, lg)}/matchs/${mo}.json`;
 const touchees = new Set();
 for (const [sp, lg] of LIGUES) {   /* migration de l'ancien rangement */
   let L = []; try { L = fs.readdirSync(`cotes/${lg}`).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)); } catch (e) {}
@@ -35,7 +40,7 @@ for (const [sp, lg] of LIGUES) {   /* migration de l'ancien rangement */
   try { if (L.length && !fs.readdirSync(`cotes/${lg}`).length) fs.rmdirSync(`cotes/${lg}`); } catch (e) {}
 }
 function indexer(sp, lg) {   /* une passe par saison présente */
-  let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}-\d{2}$/.test(d)); } catch (e) { return; }
+  let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) { return; }
   for (const sa of SA) indexerSaison(sp, lg, sa);
 }
 function indexerSaison(sp, lg, sa) {
@@ -150,6 +155,7 @@ const FOOT_ST = { totalGoals: 'G', goalAssists: 'A', totalShots: 'T', shotsOnTar
 const US_ST = {
   hockey: { G: 'G', A: 'A', SOG: 'TC', PIM: 'PIM', '+/-': 'PM', SV: 'AR', GA: 'BE', TOI: 'TOI' },
   basketball: { MIN: 'MIN', PTS: 'PTS', REB: 'REB', AST: 'AST', '3PT': '3PT', STL: 'INT', BLK: 'CTR', TO: 'BP' },
+  baseball: { 'batting:H': 'H', 'batting:R': 'R', 'batting:RBI': 'RBI', 'batting:HR': 'HR', 'batting:BB': 'BB', 'batting:K': 'K', 'batting:SB': 'SB', 'pitching:IP': 'IP', 'pitching:H': 'pH', 'pitching:ER': 'ER', 'pitching:BB': 'pBB', 'pitching:K': 'pK' },   /* 20261031d, NON sondé : libellé absent = rien */
   football: { 'passing:YDS': 'pY', 'passing:TD': 'pTD', 'passing:INT': 'pINT', 'rushing:CAR': 'CAR', 'rushing:YDS': 'rY', 'rushing:TD': 'rTD', 'receiving:REC': 'REC', 'receiving:YDS': 'reY', 'receiving:TD': 'reTD', 'interceptions:INT': 'INT', 'defensive:SACKS': 'SACK', 'kicking:PTS': 'KPTS' }
 };
 function feuille(f, sm, sp) {
