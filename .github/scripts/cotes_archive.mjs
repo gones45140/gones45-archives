@@ -2,7 +2,7 @@
 // dossier spécial » → choix B). DraftKings (via l'API ESPN) efface les cotes joueurs après le match : ce robot les enregistre AVANT.
 // Toutes les 2 h (cotes-archive.yml) : matchs des ligues ci-dessous qui commencent dans les 4 h → cotes principales (1N2, handicap,
 // total : core …/odds fournisseur 100) + propBets utiles (joueurs, buts d'équipe, les deux marquent) + noms des joueurs (effectifs ESPN).
-// Rangement (Antoine : « un dossier qui classe par championnat / équipes, et les matchs cotés ») : cotes/<ligue>/AAAA-MM.json
+// Rangement (Antoine : « un dossier qui classe par championnat / équipes, et les matchs cotés ») : cotes/<sport>/<ligue>/matchs/AAAA-MM.json
 // (mois UTC du coup d'envoi) = { eid: fiche } (fiche : h / a = équipes {id, nom, ab, c}) ; une fiche est REMPLACÉE à chaque passage avant le
 // match (dernière = la plus proche du coup d'envoi), jamais après. Lu par l'appli (fenêtre de match terminé, app.js 20261030y).
 import fs from 'node:fs';
@@ -16,6 +16,39 @@ const LIGUES = [
 const TYPES = new Set(['230', '39', '40', '219', '218', '232', '264', '31', '32', '33', '220', '221', '225', '226', '227', '327', '151', '253', '152']);
 const FENETRE = 4 * 3600e3;
 
+// 20261031b (« vu qu'on fait tous les sports, faut classer par sport, championnat, équipe / joueur ») : rangement
+// cotes/<sport>/<ligue>/matchs/AAAA-MM.json + index recalculés à chaque passage : equipes.json, equipes/<id>.json (matchs de l'équipe),
+// joueurs.json, joueurs/<idEspn>.json (historique du joueur : stats de la feuille + cotes gardées). Ancien rangement cotes/<ligue>/ migré.
+const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us' };
+const BASE = (sp, lg) => `cotes/${SPN[sp]}/${lg}`;
+const touchees = new Set();
+for (const [sp, lg] of LIGUES) {   /* migration de l'ancien rangement */
+  let L = []; try { L = fs.readdirSync(`cotes/${lg}`).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)); } catch (e) {}
+  for (const f of L) { fs.mkdirSync(`${BASE(sp, lg)}/matchs`, { recursive: true }); const dst = `${BASE(sp, lg)}/matchs/${f}`; let a = {}, b = {}; try { a = JSON.parse(fs.readFileSync(dst, 'utf8')); } catch (e) {} try { b = JSON.parse(fs.readFileSync(`cotes/${lg}/${f}`, 'utf8')); } catch (e) {} fs.writeFileSync(dst, JSON.stringify(Object.assign(b, a))); fs.unlinkSync(`cotes/${lg}/${f}`); }
+  if (L.length) touchees.add(sp + '|' + lg);
+  try { if (L.length && !fs.readdirSync(`cotes/${lg}`).length) fs.rmdirSync(`cotes/${lg}`); } catch (e) {}
+}
+function indexer(sp, lg) {
+  const B = BASE(sp, lg); let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
+  const EQ = {}, JO = {};
+  for (const f of F) {
+    const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
+    for (const [id, x] of Object.entries(D)) {
+      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null]); }
+      const ids = new Set([...Object.keys(x.st || {}), ...Object.keys(x.j || {})]);
+      for (const pid of ids) {
+        const st = (x.st || {})[pid], jc = (x.j || {})[pid], k = (st && st.k) || (jc && jc.k) || ''; if (!k) continue;
+        const j = JO[pid] || (JO[pid] = { n: (st && st.n) || (jc && jc.n) || '', eq: (x[k] || {}).id || '', m: [] });
+        j.eq = (x[k] || {}).id || j.eq; j.m.push([x.t, mo, id, (x[k] || {}).id || '', st ? st.s : null, jc ? jc.o : null]);
+      }
+    }
+  }
+  fs.mkdirSync(`${B}/equipes`, { recursive: true }); fs.mkdirSync(`${B}/joueurs`, { recursive: true });
+  const le = {}; for (const [id, e] of Object.entries(EQ)) { e.m.sort((a, b) => a[0] - b[0]); fs.writeFileSync(`${B}/equipes/${id}.json`, JSON.stringify(e)); le[id] = [e.nom, e.ab, e.m.length]; }
+  const lj = {}; for (const [id, j] of Object.entries(JO)) { j.m.sort((a, b) => a[0] - b[0]); fs.writeFileSync(`${B}/joueurs/${id}.json`, JSON.stringify(j)); lj[id] = [j.n, j.eq, j.m.length]; }
+  fs.writeFileSync(`${B}/equipes.json`, JSON.stringify(le)); fs.writeFileSync(`${B}/joueurs.json`, JSON.stringify(lj));
+  console.log(`🗂️ index ${SPN[sp]}/${lg} : ${Object.keys(le).length} équipes, ${Object.keys(lj).length} joueurs`);
+}
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 async function lire(u) {
   for (let i = 0; i < 3; i++) {
@@ -82,14 +115,14 @@ for (const [sp, lg] of (RAT ? [] : LIGUES)) {
         if (T.h.length || T.a.length) fiche.teq = T;
         if (B.length >= 2) fiche.bts = { o: B[0], n: B[1] };   // ordre reçu = oui puis non (comme la page ESPN)
       }
-      const cle = lg + '/' + new Date(t).toISOString().slice(0, 7);
+      const cle = BASE(sp, lg) + '/matchs/' + new Date(t).toISOString().slice(0, 7); touchees.add(sp + '|' + lg);
       (fichiers[cle] = fichiers[cle] || {})[String(e.id)] = fiche; nEv++;
       await pause(300);
     }
   }
 }
 for (const [cle, F] of Object.entries(fichiers)) {
-  const p = `cotes/${cle}.json`;
+  const p = `${cle}.json`;
   fs.mkdirSync(p.replace(/\/[^/]+$/, ''), { recursive: true });
   let old = {}; try { old = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) {}
   for (const [id, f] of Object.entries(F)) { if (!old[id] || !(old[id].t <= maintenant)) old[id] = f; }   // jamais après le coup d'envoi
@@ -139,7 +172,7 @@ if (!RAT) {
 const moisL = [0, -1].map((k) => { const d = new Date(maintenant); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + k); return d.toISOString().slice(0, 7); });
 for (const [sp, lg] of LIGUES) {
   for (const mo of moisL) {
-    const p = `cotes/${lg}/${mo}.json`; let F; try { F = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
+    const p = `${BASE(sp, lg)}/matchs/${mo}.json`; let F; try { F = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
     let maj = false;
     for (const [id, f] of Object.entries(F)) {
       if (f.f || !(f.t < maintenant - 3 * 3600e3) || f.t < maintenant - 10 * 864e5) continue;
@@ -151,10 +184,11 @@ for (const [sp, lg] of LIGUES) {
       try { feuille(f, sm, sp); } catch (e) { console.log('feuille ' + id + ' : ' + e.message); }
       await pause(200);
     }
-    if (maj) fs.writeFileSync(p, JSON.stringify(F));
+    if (maj) { fs.writeFileSync(p, JSON.stringify(F)); touchees.add(sp + '|' + lg); }
   }
 }
 }   /* fin !RAT */
+if (!RAT) for (const x of touchees) { const [sp, lg] = x.split('|'); indexer(sp, lg); }
 if (!RAT) console.log(`📦 scores ajoutés : ${nSc}`);
 if (!RAT) console.log(`📦 cotes gardées : ${nEv} match(s), ${nJ} joueur(s) avec cote, fichiers ${Object.keys(fichiers).join(', ') || 'aucun'}`);
 
@@ -167,8 +201,8 @@ if (RAT) {
   const L = LIGUES.find((x) => x[1] === RAT); if (!L) { console.log('ligue inconnue ' + RAT); process.exit(0); }
   const [sp, lg] = L, debut = new Date(Date.UTC(new Date(maintenant).getUTCFullYear() - 4, 6, 1)), mois = [];
   for (const d = new Date(debut); d.getTime() < maintenant; d.setUTCMonth(d.getUTCMonth() + 1)) mois.push(d.toISOString().slice(0, 7));
-  const fic = {}, lireF = (mo) => { if (!fic[mo]) { try { fic[mo] = JSON.parse(fs.readFileSync(`cotes/${lg}/${mo}.json`, 'utf8')); } catch (e) { fic[mo] = {}; } } return fic[mo]; };
-  const ecrire = () => { fs.mkdirSync(`cotes/${lg}`, { recursive: true }); for (const [mo, F] of Object.entries(fic)) if (Object.keys(F).length) fs.writeFileSync(`cotes/${lg}/${mo}.json`, JSON.stringify(F)); };
+  const B = BASE(sp, lg), fic = {}, lireF = (mo) => { if (!fic[mo]) { try { fic[mo] = JSON.parse(fs.readFileSync(`${B}/matchs/${mo}.json`, 'utf8')); } catch (e) { fic[mo] = {}; } } return fic[mo]; };
+  const ecrire = () => { fs.mkdirSync(`${B}/matchs`, { recursive: true }); for (const [mo, F] of Object.entries(fic)) if (Object.keys(F).length) fs.writeFileSync(`${B}/matchs/${mo}.json`, JSON.stringify(F)); };
   let n = 0, nouv = 0;
   for (const mo of mois) {
     const sb = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/scoreboard?dates=${mo.replace('-', '')}&limit=1000`);
@@ -195,6 +229,6 @@ if (RAT) {
       await pause(120);
     }
   }
-  ecrire();
+  ecrire(); indexer(sp, lg);
   console.log(`📦 rattrapage ${lg} : ${nouv} match(s) ajoutés sur ${mois.length} mois`);
 }
