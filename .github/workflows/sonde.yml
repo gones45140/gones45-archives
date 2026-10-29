@@ -1,0 +1,11 @@
+name: sonde
+on: workflow_dispatch
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: .github }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: node .github/sonde/s.mjs
