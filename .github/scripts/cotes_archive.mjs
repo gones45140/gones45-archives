@@ -51,7 +51,7 @@ function indexerSaison(sp, lg, sa) {
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
-      if (x.f) { ETAT.n++; if (x.v2 || sp !== 'soccer') ETAT.v2++; }
+      if (x.f) { ETAT.n++; if (x.v2) ETAT.v2++; }
       for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0]);   /* 20261031l : + type (-1 inconnu), prolongation */ }
       const ids = new Set([...Object.keys(x.st || {}), ...Object.keys(x.j || {})]);
       for (const pid of ids) {
@@ -199,6 +199,7 @@ function feuille(f, sm, sp) {
         const lab = cat.labels || [];
         for (const a of cat.athletes || []) {
           const at = a.athlete || {}; if (!at.id || a.didNotPlay) continue;
+          met(String(at.id), at.displayName, k, 'J', 1);   /* 20261031n : a joué (même sans stat) = présence, comme _g45JouPresents de l'appli */
           const cn = cat.name || cat.type;   /* 20261031l : SONDÉ MLB (29/10) — catégories sans name, type « batting » / « pitching » */
           lab.forEach((L, i) => { const c = M[(cn ? cn + ':' : '') + L] || (sp !== 'football' ? M[L] : null); if (!c) return; let v = (a.stats || [])[i]; if (c === '3PT') v = parseInt(String(v || '').split('-')[0], 10); met(String(at.id), at.displayName, k, c, v); });
         }
@@ -225,7 +226,7 @@ for (const [sp, lg] of LIGUES) {
       const sc = {}; for (const c of cp.competitors || []) sc[c.homeAway === 'home' ? 'h' : 'a'] = parseInt(c.score, 10);
       if (!isNaN(sc.h) && !isNaN(sc.a)) { f.f = sc; maj = true; nSc++; f.ot = otDe(st.detail || st.shortDetail); }
       try { feuille(f, sm, sp); } catch (e) { console.log('feuille ' + id + ' : ' + e.message); }
-      if (sp === 'soccer') f.v2 = 1;   /* 20261031k : feuille avec cf + REM */
+      f.v2 = 1;   /* 20261031k / n : feuille complète */
       await pause(200);
     }
     if (maj) { fs.writeFileSync(p, JSON.stringify(F)); touchees.add(sp + '|' + lg); }
@@ -294,7 +295,7 @@ if (RAT) {
       // 20261031k : foot déjà rattrapé SANS feuille d'équipe (cf) ou sans remplaçants (REM) → relu une fois (mise à niveau des 4 saisons)
       const vx = F[e.id], tyE = (e.season || {}).type || 0, otE = otDe(st.detail || st.shortDetail);
       if (vx && vx.ty == null && tyE) { vx.ty = tyE; vx.ot = otE; }   /* 20261031l : type de match + prolongation, sans relire la feuille */
-      if (vx && vx.f && (sp !== 'soccer' || vx.cf || vx.v2) && (sp !== 'baseball' || vx.st || vx.v2)) continue;   /* MLB sans stats joueurs (avant 20261031l) → relu */
+      if (vx && vx.f && vx.v2) continue;   /* 20261031n : v2 = feuille complète (foot cf + REM, US présence J, MLB batting / pitching) ; sinon relue une fois */
       const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${e.id}`); if (!sm) continue;
       const cp = (((sm.header || {}).competitions) || [])[0] || {}, eq = {}, sc = {};
       for (const c of cp.competitors || []) { const tm = c.team || {}, k = c.homeAway === 'home' ? 'h' : 'a'; eq[k] = { id: String(tm.id || ''), nom: tm.shortDisplayName || tm.displayName || '', ab: tm.abbreviation || '', c: tm.color ? '#' + tm.color : '' }; sc[k] = parseInt(c.score, 10); }
@@ -309,8 +310,7 @@ if (RAT) {
         if (!(f.ml.h > 1 || f.ml.a > 1)) delete f.ml; if (!(f.hc.h > 1 || f.hc.a > 1)) delete f.hc; if (!(f.tot.o > 1 || f.tot.u > 1) || f.tot.L == null) delete f.tot;
       }
       try { feuille(f, sm, sp); } catch (x) {}
-      if (sp === 'baseball') f.v2 = 1;
-      if (sp === 'soccer') f.v2 = 1;   /* lu avec cf + REM (même si ESPN n'a pas de stats d'équipe pour ce match) */
+      f.v2 = 1;   /* lu avec cf + REM / présence J (même si ESPN n'a pas de stats d'équipe pour ce match) */
       if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2, ty: tyE, ot: otE }); if (!vx.f) delete vx.f; } else F[e.id] = f;   /* fiche du direct : ses cotes gardées */
       nouv++;
       if (++n % 150 === 0) { ecrire(); console.log(`… ${lg} ${n} matchs`); }
