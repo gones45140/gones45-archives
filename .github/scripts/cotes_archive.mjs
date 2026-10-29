@@ -47,7 +47,7 @@ function indexer(sp, lg) {   /* une passe par saison présente */
 }
 function indexerSaison(sp, lg, sa) {
   const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
-  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0 };   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
+  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 2 };   /* iv 2 = index joueurs avec côté (20261031o) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
@@ -57,7 +57,7 @@ function indexerSaison(sp, lg, sa) {
       for (const pid of ids) {
         const st = (x.st || {})[pid], jc = (x.j || {})[pid], k = (st && st.k) || (jc && jc.k) || ''; if (!k) continue;
         const j = JO[pid] || (JO[pid] = { n: (st && st.n) || (jc && jc.n) || '', eq: (x[k] || {}).id || '', m: [] });
-        j.eq = (x[k] || {}).id || j.eq; j.m.push([x.t, mo, id, (x[k] || {}).id || '', st ? st.s : null, jc ? jc.o : null]);
+        j.eq = (x[k] || {}).id || j.eq; j.m.push([x.t, mo, id, (x[k] || {}).id || '', st ? st.s : null, jc ? jc.o : null, k]);   /* 20261031o : + côté h|a (Séries individuelles 🏠 / ✈️) */
       }
     }
   }
@@ -235,7 +235,7 @@ for (const [sp, lg] of LIGUES) {
 }   /* fin !RAT */
 if (!RAT) for (const x of touchees) { const [sp, lg] = x.split('|'); indexer(sp, lg); }
 // 20261031k : saison sans etat.json (indexée avant ce fichier, ex. par un rattrapage plus ancien) → réindexée une fois
-if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) if (!fs.existsSync(`${BASE(sp, lg)}/${sa}/etat.json`)) indexerSaison(sp, lg, sa); }
+if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) { let et = null; try { et = JSON.parse(fs.readFileSync(`${BASE(sp, lg)}/${sa}/etat.json`, 'utf8')); } catch (e) {} if (!et || !(et.iv >= 2)) indexerSaison(sp, lg, sa); } }   /* 20261031o : index plus ancien → refait */
 if (!RAT) console.log(`📦 scores ajoutés : ${nSc}`);
 // ═══ 20261031h — ↪️ CARRIÈRES (Antoine : « attention, lors d'un transfert… » puis « et les archives le savent ? »). Chaque match note déjà le club
 // du joueur CE jour-là, mais un joueur qui change de championnat (Lyon → Chelsea) avait 2 fiches sans lien. Fiche CENTRALE par sport :
