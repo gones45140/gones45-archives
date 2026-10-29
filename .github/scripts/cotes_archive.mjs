@@ -47,10 +47,11 @@ function indexer(sp, lg) {   /* une passe par saison présente */
 }
 function indexerSaison(sp, lg, sa) {
   const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
-  const EQ = {}, JO = {};
+  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0 };   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
+      if (x.f) { ETAT.n++; if (x.v2 || sp !== 'soccer') ETAT.v2++; }
       for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null]); }
       const ids = new Set([...Object.keys(x.st || {}), ...Object.keys(x.j || {})]);
       for (const pid of ids) {
@@ -63,7 +64,7 @@ function indexerSaison(sp, lg, sa) {
   fs.mkdirSync(`${B}/equipes`, { recursive: true }); fs.mkdirSync(`${B}/joueurs`, { recursive: true });
   const le = {}; for (const [id, e] of Object.entries(EQ)) { e.m.sort((a, b) => a[0] - b[0]); fs.writeFileSync(`${B}/equipes/${id}.json`, JSON.stringify(e)); le[id] = [e.nom, e.ab, e.m.length]; }
   const lj = {}; for (const [id, j] of Object.entries(JO)) { j.m.sort((a, b) => a[0] - b[0]); j.eq = (j.m[j.m.length - 1] || [])[3] || j.eq; /* 20261031h : club du DERNIER match */ fs.writeFileSync(`${B}/joueurs/${id}.json`, JSON.stringify(j)); lj[id] = [j.n, j.eq, j.m.length]; }
-  fs.writeFileSync(`${B}/equipes.json`, JSON.stringify(le)); fs.writeFileSync(`${B}/joueurs.json`, JSON.stringify(lj));
+  fs.writeFileSync(`${B}/equipes.json`, JSON.stringify(le)); fs.writeFileSync(`${B}/etat.json`, JSON.stringify(ETAT)); fs.writeFileSync(`${B}/joueurs.json`, JSON.stringify(lj));
   console.log(`🗂️ index ${SPN[sp]}/${lg}/${sa} : ${Object.keys(le).length} équipes, ${Object.keys(lj).length} joueurs`);
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -220,6 +221,7 @@ for (const [sp, lg] of LIGUES) {
       const sc = {}; for (const c of cp.competitors || []) sc[c.homeAway === 'home' ? 'h' : 'a'] = parseInt(c.score, 10);
       if (!isNaN(sc.h) && !isNaN(sc.a)) { f.f = sc; maj = true; nSc++; }
       try { feuille(f, sm, sp); } catch (e) { console.log('feuille ' + id + ' : ' + e.message); }
+      if (sp === 'soccer') f.v2 = 1;   /* 20261031k : feuille avec cf + REM */
       await pause(200);
     }
     if (maj) { fs.writeFileSync(p, JSON.stringify(F)); touchees.add(sp + '|' + lg); }
