@@ -19,7 +19,9 @@ const LIGUES = [
 const CIVIL = new Set(['mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
 // types propBets gardés (sondés par Antoine, 30/10) : joueurs + buts d'équipe + les deux marquent
 const TYPES = new Set(['230', '39', '40', '219', '218', '232', '264', '31', '32', '33', '220', '221', '225', '226', '227', '327', '151', '253', '152']);
-const FENETRE = 4 * 3600e3;
+// 20261031f : 8 h au lieu de 4 h (Antoine : « on a pas les cotes des joueurs, faudra les garder ») → un passage de 2 h sauté par
+// GitHub (fréquent sur un dépôt neuf) ne fait plus perdre un match ; chaque passage réécrit la fiche, la dernière avant le coup d'envoi reste.
+const FENETRE = 8 * 3600e3;
 
 // 20261031b (« vu qu'on fait tous les sports, faut classer par sport, championnat, équipe / joueur ») : rangement
 // cotes/<sport>/<ligue>/<saison>/matchs/AAAA-MM.json + index recalculés à chaque passage : equipes.json, equipes/<id>.json (matchs de l'équipe),
@@ -140,7 +142,12 @@ for (const [cle, F] of Object.entries(fichiers)) {
   const p = `${cle}.json`;
   fs.mkdirSync(p.replace(/\/[^/]+$/, ''), { recursive: true });
   let old = {}; try { old = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) {}
-  for (const [id, f] of Object.entries(F)) { if (!old[id] || !(old[id].t <= maintenant)) old[id] = f; }   // jamais après le coup d'envoi
+  for (const [id, f] of Object.entries(F)) {
+    if (old[id] && old[id].t <= maintenant) continue;   // jamais après le coup d'envoi
+    // 20261031f : un passage sans cotes joueurs / équipe (ESPN muet, retirées) n'efface pas celles d'un passage précédent
+    if (old[id]) for (const k of ['j', 'teq', 'bts', 'ml', 'hc', 'tot']) if (f[k] == null && old[id][k] != null) f[k] = old[id][k];
+    old[id] = f;
+  }
   fs.writeFileSync(p, JSON.stringify(old));
 }
 // 20261030z (« ajoute les buteurs et passeurs, pointeurs, TD… en fait un max d'info ») : FEUILLE DE MATCH gardée avec le score. SONDÉ
