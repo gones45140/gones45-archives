@@ -62,7 +62,7 @@ function indexerSaison(sp, lg, sa) {
   }
   fs.mkdirSync(`${B}/equipes`, { recursive: true }); fs.mkdirSync(`${B}/joueurs`, { recursive: true });
   const le = {}; for (const [id, e] of Object.entries(EQ)) { e.m.sort((a, b) => a[0] - b[0]); fs.writeFileSync(`${B}/equipes/${id}.json`, JSON.stringify(e)); le[id] = [e.nom, e.ab, e.m.length]; }
-  const lj = {}; for (const [id, j] of Object.entries(JO)) { j.m.sort((a, b) => a[0] - b[0]); fs.writeFileSync(`${B}/joueurs/${id}.json`, JSON.stringify(j)); lj[id] = [j.n, j.eq, j.m.length]; }
+  const lj = {}; for (const [id, j] of Object.entries(JO)) { j.m.sort((a, b) => a[0] - b[0]); j.eq = (j.m[j.m.length - 1] || [])[3] || j.eq; /* 20261031h : club du DERNIER match */ fs.writeFileSync(`${B}/joueurs/${id}.json`, JSON.stringify(j)); lj[id] = [j.n, j.eq, j.m.length]; }
   fs.writeFileSync(`${B}/equipes.json`, JSON.stringify(le)); fs.writeFileSync(`${B}/joueurs.json`, JSON.stringify(lj));
   console.log(`🗂️ index ${SPN[sp]}/${lg}/${sa} : ${Object.keys(le).length} équipes, ${Object.keys(lj).length} joueurs`);
 }
@@ -213,6 +213,42 @@ for (const [sp, lg] of LIGUES) {
 }   /* fin !RAT */
 if (!RAT) for (const x of touchees) { const [sp, lg] = x.split('|'); indexer(sp, lg); }
 if (!RAT) console.log(`📦 scores ajoutés : ${nSc}`);
+// ═══ 20261031h — ↪️ CARRIÈRES (Antoine : « attention, lors d'un transfert… » puis « et les archives le savent ? »). Chaque match note déjà le club
+// du joueur CE jour-là, mais un joueur qui change de championnat (Lyon → Chelsea) avait 2 fiches sans lien. Fiche CENTRALE par sport :
+// cotes/<sport>/joueurs/<idEspn>.json = { n, eq (club du dernier match), lg, c: [[ligue, saison, idClub, nomClub, nbMatchs, 1er t, dernier t]] }
+// (ordre chronologique ; un transfert en cours de saison = 2 lignes), + cotes/<sport>/joueurs.json = { id: [nom, club, ligue, nb lignes] }.
+// Recalculé par le robot des 2 h seulement (le rattrapage tourne en parallèle : pas de fichier commun → pas de conflit Git).
+function carrieres() {
+  for (const spn of Object.values(SPN)) {
+    const R = `cotes/${spn}`; let LG = []; try { LG = fs.readdirSync(R).filter((d) => d !== 'joueurs' && fs.statSync(`${R}/${d}`).isDirectory()); } catch (e) { continue; }
+    const G = {};
+    for (const lg of LG) {
+      let SA = []; try { SA = fs.readdirSync(`${R}/${lg}`).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {}
+      for (const sa of SA) {
+        let EQ = {}, F = []; try { EQ = JSON.parse(fs.readFileSync(`${R}/${lg}/${sa}/equipes.json`, 'utf8')); } catch (e) {}
+        try { F = fs.readdirSync(`${R}/${lg}/${sa}/joueurs`); } catch (e) {}
+        for (const f of F) {
+          let j; try { j = JSON.parse(fs.readFileSync(`${R}/${lg}/${sa}/joueurs/${f}`, 'utf8')); } catch (e) { continue; }
+          const id = f.replace(/\.json$/, ''), g = G[id] || (G[id] = { n: j.n, c: [] }), parEq = {};
+          for (const m of j.m || []) { const e = m[3] || '', x = parEq[e] || (parEq[e] = [lg, sa, e, (EQ[e] || [])[0] || '', 0, m[0], m[0]]); x[4]++; if (m[0] < x[5]) x[5] = m[0]; if (m[0] > x[6]) x[6] = m[0]; }
+          g.c.push(...Object.values(parEq)); if (j.n) g.n = j.n;
+        }
+      }
+    }
+    if (!Object.keys(G).length) continue;
+    fs.mkdirSync(`${R}/joueurs`, { recursive: true });
+    const idx = {};
+    for (const [id, g] of Object.entries(G)) {
+      g.c.sort((a, b) => a[5] - b[5]); const nat = g.c.filter((x) => /^[a-z]{3}\.\d$|^(nhl|nba|nfl|mlb)$/.test(x[0])), d = (nat.length ? nat : g.c)[(nat.length ? nat : g.c).length - 1]; g.eq = d[3]; g.lg = d[0];   /* championnat national d'abord (pas la C1) */
+      const p = `${R}/joueurs/${id}.json`, txt = JSON.stringify(g); let old = ''; try { old = fs.readFileSync(p, 'utf8'); } catch (e) {}
+      if (old !== txt) fs.writeFileSync(p, txt);
+      idx[id] = [g.n, g.eq, g.lg, g.c.length];
+    }
+    fs.writeFileSync(`${R}/joueurs.json`, JSON.stringify(idx));
+    console.log(`↪️ carrières ${spn} : ${Object.keys(G).length} joueurs`);
+  }
+}
+if (!RAT) carrieres();
 if (!RAT) console.log(`📦 cotes gardées : ${nEv} match(s), ${nJ} joueur(s) avec cote, fichiers ${Object.keys(fichiers).join(', ') || 'aucun'}`);
 
 // ═══ 20261031a — RATTRAPAGE DES 4 SAISONS PASSÉES (Antoine : « le gourmand : on n'a qu'à choper depuis 4 ans », dépôt à part gones45-archives
