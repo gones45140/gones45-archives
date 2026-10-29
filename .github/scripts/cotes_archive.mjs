@@ -18,7 +18,7 @@ const LIGUES = [
 // saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
 const CIVIL = new Set(['mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
 // types propBets gardés (sondés par Antoine, 30/10) : joueurs + buts d'équipe + les deux marquent
-const TYPES = new Set(['230', '39', '40', '219', '218', '232', '264', '31', '32', '33', '220', '221', '225', '226', '227', '327', '151', '253', '152']);
+const TYPES = new Set(['230', '39', '40', '219', '218', '232', '264', '31', '32', '33', '220', '221', '225', '226', '227', '327', '151', '253', '152', '153']);   /* 20261031x : 153 = « prolongation ? » (cote du OUI, NHL) → fiche.pro (1N2 60 min estimé) */
 // 20261031f : 8 h au lieu de 4 h (Antoine : « on a pas les cotes des joueurs, faudra les garder ») → un passage de 2 h sauté par
 // GitHub (fréquent sur un dépôt neuf) ne fait plus perdre un match ; chaque passage réécrit la fiche, la dernière avant le coup d'envoi reste.
 const FENETRE = 8 * 3600e3;
@@ -124,6 +124,7 @@ for (const [sp, lg] of (RAT ? [] : LIGUES)) {
           const ty = String(x.type.id), d = cotePb(x); if (!d) continue;
           const tg = parseFloat(((x.current || {}).target || {}).value), cible = isNaN(tg) ? null : tg;
           if (ty === '152') { B.push(d); continue; }
+          if (ty === '153') { fiche.pro = d; continue; }
           if (ty === '151' || ty === '253') { const tm = String((x.team || {}).$ref || '').match(/teams\/(\d+)/); const k = tm && tm[1] === fiche.h.id ? 'h' : (tm && tm[1] === fiche.a.id ? 'a' : ''); if (k && cible != null) T[k].push([cible, d]); continue; }
           const a = String((x.athlete || {}).$ref || '').match(/athletes\/(\d+)/); if (!a) continue;
           const nm = noms[a[1]]; if (!nm || !nm[0]) continue;
