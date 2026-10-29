@@ -52,7 +52,7 @@ function indexerSaison(sp, lg, sa) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
       if (x.f) { ETAT.n++; if (x.v2 || sp !== 'soccer') ETAT.v2++; }
-      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null]); }
+      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0]);   /* 20261031l : + type (-1 inconnu), prolongation */ }
       const ids = new Set([...Object.keys(x.st || {}), ...Object.keys(x.j || {})]);
       for (const pid of ids) {
         const st = (x.st || {})[pid], jc = (x.j || {})[pid], k = (st && st.k) || (jc && jc.k) || ''; if (!k) continue;
@@ -98,7 +98,7 @@ for (const [sp, lg] of (RAT ? [] : LIGUES)) {
       if (!(t > maintenant) || t - maintenant > FENETRE || st.completed || st.state === 'in') continue;
       const cp = (e.competitions || [])[0] || {}, eq = {};
       for (const c of cp.competitors || []) { const tm = c.team || {}; eq[c.homeAway === 'home' ? 'h' : 'a'] = { id: String(tm.id || ''), nom: tm.shortDisplayName || tm.displayName || '', ab: tm.abbreviation || '', c: tm.color ? '#' + tm.color : '' }; }
-      const fiche = { lg, s: sp, t, n: e.name || '', h: eq.h || {}, a: eq.a || {}, at: maintenant };
+      const fiche = { lg, s: sp, t, n: e.name || '', h: eq.h || {}, a: eq.a || {}, at: maintenant, ty: (e.season || {}).type || 0 };
       // cotes principales
       const od = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${e.id}/competitions/${e.id}/odds`);
       const o = ((od && od.items) || []).find((x) => String((x.provider || {}).id) === '100') || ((od && od.items) || [])[0];
@@ -166,6 +166,9 @@ const US_ST = {
   baseball: { 'batting:H': 'H', 'batting:R': 'R', 'batting:RBI': 'RBI', 'batting:HR': 'HR', 'batting:BB': 'BB', 'batting:K': 'K', 'batting:SB': 'SB', 'pitching:IP': 'IP', 'pitching:H': 'pH', 'pitching:ER': 'ER', 'pitching:BB': 'pBB', 'pitching:K': 'pK' },   /* 20261031d, NON sondé : libellé absent = rien */
   football: { 'passing:YDS': 'pY', 'passing:TD': 'pTD', 'passing:INT': 'pINT', 'rushing:CAR': 'CAR', 'rushing:YDS': 'rY', 'rushing:TD': 'rTD', 'receiving:REC': 'REC', 'receiving:YDS': 'reY', 'receiving:TD': 'reTD', 'interceptions:INT': 'INT', 'defensive:SACKS': 'SACK', 'kicking:PTS': 'KPTS' }
 };
+// 20261031l (critères NHL / NBA / NFL sur les archives) : SONDÉ (robot sonde, 29/10) scoreboard events[].season { year, type 1 présaison / 2 saison
+// régulière / 3 séries } ; status.type.detail « Final », « Final/OT », « Final/SO », « Final/2OT » → fiche.ty, fiche.ot (même règle que l'appli : SO 2, OT 1).
+const otDe = (d) => (/\bSO\b/.test(d || '') ? 2 : (/\bOT\b/.test(d || '') ? 1 : 0));
 function feuille(f, sm, sp) {
   const kDe = (tid) => (String(tid) === String(f.h.id) ? 'h' : (String(tid) === String(f.a.id) ? 'a' : ''));
   const st = {};
@@ -219,7 +222,7 @@ for (const [sp, lg] of LIGUES) {
       const cp = ((((sm || {}).header || {}).competitions) || [])[0] || {}, st = ((cp.status || {}).type || {});
       if (!st.completed) continue;
       const sc = {}; for (const c of cp.competitors || []) sc[c.homeAway === 'home' ? 'h' : 'a'] = parseInt(c.score, 10);
-      if (!isNaN(sc.h) && !isNaN(sc.a)) { f.f = sc; maj = true; nSc++; }
+      if (!isNaN(sc.h) && !isNaN(sc.a)) { f.f = sc; maj = true; nSc++; f.ot = otDe(st.detail || st.shortDetail); }
       try { feuille(f, sm, sp); } catch (e) { console.log('feuille ' + id + ' : ' + e.message); }
       if (sp === 'soccer') f.v2 = 1;   /* 20261031k : feuille avec cf + REM */
       await pause(200);
@@ -288,11 +291,13 @@ if (RAT) {
       const st = ((e.status || {}).type || {}); if (!st.completed) continue;
       const t = Date.parse(e.date), moE = new Date(t).toISOString().slice(0, 7), F = lireF(moE);
       // 20261031k : foot déjà rattrapé SANS feuille d'équipe (cf) ou sans remplaçants (REM) → relu une fois (mise à niveau des 4 saisons)
-      const vx = F[e.id]; if (vx && vx.f && (sp !== 'soccer' || vx.cf || vx.v2)) continue;
+      const vx = F[e.id], tyE = (e.season || {}).type || 0, otE = otDe(st.detail || st.shortDetail);
+      if (vx && vx.ty == null && tyE) { vx.ty = tyE; vx.ot = otE; }   /* 20261031l : type de match + prolongation, sans relire la feuille */
+      if (vx && vx.f && (sp !== 'soccer' || vx.cf || vx.v2)) continue;
       const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${e.id}`); if (!sm) continue;
       const cp = (((sm.header || {}).competitions) || [])[0] || {}, eq = {}, sc = {};
       for (const c of cp.competitors || []) { const tm = c.team || {}, k = c.homeAway === 'home' ? 'h' : 'a'; eq[k] = { id: String(tm.id || ''), nom: tm.shortDisplayName || tm.displayName || '', ab: tm.abbreviation || '', c: tm.color ? '#' + tm.color : '' }; sc[k] = parseInt(c.score, 10); }
-      const f = { lg, s: sp, t, n: e.name || '', h: eq.h || {}, a: eq.a || {}, at: maintenant, r: 1 };
+      const f = { lg, s: sp, t, n: e.name || '', h: eq.h || {}, a: eq.a || {}, at: maintenant, r: 1, ty: tyE, ot: otE };
       if (!isNaN(sc.h) && !isNaN(sc.a)) f.f = sc;
       const o = (sm.pickcenter || [])[0];
       if (o) {
@@ -304,7 +309,7 @@ if (RAT) {
       }
       try { feuille(f, sm, sp); } catch (x) {}
       if (sp === 'soccer') f.v2 = 1;   /* lu avec cf + REM (même si ESPN n'a pas de stats d'équipe pour ce match) */
-      if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2 }); if (!vx.f) delete vx.f; } else F[e.id] = f;   /* fiche du direct : ses cotes gardées */
+      if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2, ty: tyE, ot: otE }); if (!vx.f) delete vx.f; } else F[e.id] = f;   /* fiche du direct : ses cotes gardées */
       nouv++;
       if (++n % 150 === 0) { ecrire(); console.log(`… ${lg} ${n} matchs`); }
       await pause(120);
