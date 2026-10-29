@@ -2,7 +2,7 @@
 // dossier spécial » → choix B). DraftKings (via l'API ESPN) efface les cotes joueurs après le match : ce robot les enregistre AVANT.
 // Toutes les 2 h (cotes-archive.yml) : matchs des ligues ci-dessous qui commencent dans les 4 h → cotes principales (1N2, handicap,
 // total : core …/odds fournisseur 100) + propBets utiles (joueurs, buts d'équipe, les deux marquent) + noms des joueurs (effectifs ESPN).
-// Rangement (Antoine : « un dossier qui classe par championnat / équipes, et les matchs cotés ») : cotes/<sport>/<ligue>/matchs/AAAA-MM.json
+// Rangement (Antoine : « un dossier qui classe par championnat / équipes, et les matchs cotés ») : cotes/<sport>/<ligue>/<saison>/matchs/AAAA-MM.json
 // (mois UTC du coup d'envoi) = { eid: fiche } (fiche : h / a = équipes {id, nom, ab, c}) ; une fiche est REMPLACÉE à chaque passage avant le
 // match (dernière = la plus proche du coup d'envoi), jamais après. Lu par l'appli (fenêtre de match terminé, app.js 20261030y).
 import fs from 'node:fs';
@@ -17,19 +17,29 @@ const TYPES = new Set(['230', '39', '40', '219', '218', '232', '264', '31', '32'
 const FENETRE = 4 * 3600e3;
 
 // 20261031b (« vu qu'on fait tous les sports, faut classer par sport, championnat, équipe / joueur ») : rangement
-// cotes/<sport>/<ligue>/matchs/AAAA-MM.json + index recalculés à chaque passage : equipes.json, equipes/<id>.json (matchs de l'équipe),
+// cotes/<sport>/<ligue>/<saison>/matchs/AAAA-MM.json + index recalculés à chaque passage : equipes.json, equipes/<id>.json (matchs de l'équipe),
 // joueurs.json, joueurs/<idEspn>.json (historique du joueur : stats de la feuille + cotes gardées). Ancien rangement cotes/<ligue>/ migré.
 const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us' };
 const BASE = (sp, lg) => `cotes/${SPN[sp]}/${lg}`;
+// 20261031c (« ça sera classé par saison ? ») : saison = juillet → juin pour tous les sports (2026-27 = 07/2026 → 06/2027, NFL comprise)
+const SAISON = (mo) => { const y = +mo.slice(0, 4), m = +mo.slice(5, 7); return m >= 7 ? y + '-' + String(y + 1).slice(2) : (y - 1) + '-' + String(y).slice(2); };
+const FMOIS = (sp, lg, mo) => `${BASE(sp, lg)}/${SAISON(mo)}/matchs/${mo}.json`;
 const touchees = new Set();
 for (const [sp, lg] of LIGUES) {   /* migration de l'ancien rangement */
   let L = []; try { L = fs.readdirSync(`cotes/${lg}`).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)); } catch (e) {}
-  for (const f of L) { fs.mkdirSync(`${BASE(sp, lg)}/matchs`, { recursive: true }); const dst = `${BASE(sp, lg)}/matchs/${f}`; let a = {}, b = {}; try { a = JSON.parse(fs.readFileSync(dst, 'utf8')); } catch (e) {} try { b = JSON.parse(fs.readFileSync(`cotes/${lg}/${f}`, 'utf8')); } catch (e) {} fs.writeFileSync(dst, JSON.stringify(Object.assign(b, a))); fs.unlinkSync(`cotes/${lg}/${f}`); }
+  for (const f of L) { const dst = FMOIS(sp, lg, f.slice(0, 7)); fs.mkdirSync(dst.replace(/\/[^/]+$/, ''), { recursive: true }); let a = {}, b = {}; try { a = JSON.parse(fs.readFileSync(dst, 'utf8')); } catch (e) {} try { b = JSON.parse(fs.readFileSync(`cotes/${lg}/${f}`, 'utf8')); } catch (e) {} fs.writeFileSync(dst, JSON.stringify(Object.assign(b, a))); fs.unlinkSync(`cotes/${lg}/${f}`); }
   if (L.length) touchees.add(sp + '|' + lg);
+  let L2 = []; try { L2 = fs.readdirSync(`${BASE(sp, lg)}/matchs`).filter((f) => /^\d{4}-\d{2}\.json$/.test(f)); } catch (e) {}   /* rangement 20261031b → saisons */
+  for (const f of L2) { const src = `${BASE(sp, lg)}/matchs/${f}`, dst = FMOIS(sp, lg, f.slice(0, 7)); fs.mkdirSync(dst.replace(/\/[^/]+$/, ''), { recursive: true }); let a = {}, b = {}; try { a = JSON.parse(fs.readFileSync(dst, 'utf8')); } catch (e) {} try { b = JSON.parse(fs.readFileSync(src, 'utf8')); } catch (e) {} fs.writeFileSync(dst, JSON.stringify(Object.assign(b, a))); fs.unlinkSync(src); touchees.add(sp + '|' + lg); }
+  if (L2.length) { for (const x of ['equipes', 'joueurs']) { try { fs.rmSync(`${BASE(sp, lg)}/${x}`, { recursive: true, force: true }); fs.rmSync(`${BASE(sp, lg)}/${x}.json`, { force: true }); } catch (e) {} } try { fs.rmdirSync(`${BASE(sp, lg)}/matchs`); } catch (e) {} }
   try { if (L.length && !fs.readdirSync(`cotes/${lg}`).length) fs.rmdirSync(`cotes/${lg}`); } catch (e) {}
 }
-function indexer(sp, lg) {
-  const B = BASE(sp, lg); let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
+function indexer(sp, lg) {   /* une passe par saison présente */
+  let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}-\d{2}$/.test(d)); } catch (e) { return; }
+  for (const sa of SA) indexerSaison(sp, lg, sa);
+}
+function indexerSaison(sp, lg, sa) {
+  const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
   const EQ = {}, JO = {};
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
@@ -47,7 +57,7 @@ function indexer(sp, lg) {
   const le = {}; for (const [id, e] of Object.entries(EQ)) { e.m.sort((a, b) => a[0] - b[0]); fs.writeFileSync(`${B}/equipes/${id}.json`, JSON.stringify(e)); le[id] = [e.nom, e.ab, e.m.length]; }
   const lj = {}; for (const [id, j] of Object.entries(JO)) { j.m.sort((a, b) => a[0] - b[0]); fs.writeFileSync(`${B}/joueurs/${id}.json`, JSON.stringify(j)); lj[id] = [j.n, j.eq, j.m.length]; }
   fs.writeFileSync(`${B}/equipes.json`, JSON.stringify(le)); fs.writeFileSync(`${B}/joueurs.json`, JSON.stringify(lj));
-  console.log(`🗂️ index ${SPN[sp]}/${lg} : ${Object.keys(le).length} équipes, ${Object.keys(lj).length} joueurs`);
+  console.log(`🗂️ index ${SPN[sp]}/${lg}/${sa} : ${Object.keys(le).length} équipes, ${Object.keys(lj).length} joueurs`);
 }
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 async function lire(u) {
@@ -115,7 +125,7 @@ for (const [sp, lg] of (RAT ? [] : LIGUES)) {
         if (T.h.length || T.a.length) fiche.teq = T;
         if (B.length >= 2) fiche.bts = { o: B[0], n: B[1] };   // ordre reçu = oui puis non (comme la page ESPN)
       }
-      const cle = BASE(sp, lg) + '/matchs/' + new Date(t).toISOString().slice(0, 7); touchees.add(sp + '|' + lg);
+      const cle = FMOIS(sp, lg, new Date(t).toISOString().slice(0, 7)).replace(/\.json$/, ''); touchees.add(sp + '|' + lg);
       (fichiers[cle] = fichiers[cle] || {})[String(e.id)] = fiche; nEv++;
       await pause(300);
     }
@@ -172,7 +182,7 @@ if (!RAT) {
 const moisL = [0, -1].map((k) => { const d = new Date(maintenant); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + k); return d.toISOString().slice(0, 7); });
 for (const [sp, lg] of LIGUES) {
   for (const mo of moisL) {
-    const p = `${BASE(sp, lg)}/matchs/${mo}.json`; let F; try { F = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
+    const p = FMOIS(sp, lg, mo); let F; try { F = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
     let maj = false;
     for (const [id, f] of Object.entries(F)) {
       if (f.f || !(f.t < maintenant - 3 * 3600e3) || f.t < maintenant - 10 * 864e5) continue;
@@ -201,8 +211,8 @@ if (RAT) {
   const L = LIGUES.find((x) => x[1] === RAT); if (!L) { console.log('ligue inconnue ' + RAT); process.exit(0); }
   const [sp, lg] = L, debut = new Date(Date.UTC(new Date(maintenant).getUTCFullYear() - 4, 6, 1)), mois = [];
   for (const d = new Date(debut); d.getTime() < maintenant; d.setUTCMonth(d.getUTCMonth() + 1)) mois.push(d.toISOString().slice(0, 7));
-  const B = BASE(sp, lg), fic = {}, lireF = (mo) => { if (!fic[mo]) { try { fic[mo] = JSON.parse(fs.readFileSync(`${B}/matchs/${mo}.json`, 'utf8')); } catch (e) { fic[mo] = {}; } } return fic[mo]; };
-  const ecrire = () => { fs.mkdirSync(`${B}/matchs`, { recursive: true }); for (const [mo, F] of Object.entries(fic)) if (Object.keys(F).length) fs.writeFileSync(`${B}/matchs/${mo}.json`, JSON.stringify(F)); };
+  const fic = {}, lireF = (mo) => { if (!fic[mo]) { try { fic[mo] = JSON.parse(fs.readFileSync(FMOIS(sp, lg, mo), 'utf8')); } catch (e) { fic[mo] = {}; } } return fic[mo]; };
+  const ecrire = () => { for (const [mo, F] of Object.entries(fic)) if (Object.keys(F).length) { const p = FMOIS(sp, lg, mo); fs.mkdirSync(p.replace(/\/[^/]+$/, ''), { recursive: true }); fs.writeFileSync(p, JSON.stringify(F)); } };
   let n = 0, nouv = 0;
   for (const mo of mois) {
     const sb = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/scoreboard?dates=${mo.replace('-', '')}&limit=1000`);
