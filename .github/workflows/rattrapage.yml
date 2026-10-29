@@ -1,0 +1,58 @@
+# GONES45 — rattrapage des 4 saisons passées dans l'archive (20261031a, « on n'a qu'à choper depuis 4 ans »). Lancé à la main, une fois.
+# Une ligue par tâche (2 à la fois pour ménager ESPN) ; relançable sans tout refaire (matchs déjà gardés sautés).
+name: rattrapage
+on:
+  workflow_dispatch:
+    inputs:
+      ligue:
+        description: 'Une ligue (fra.1, nhl…) ou « toutes »'
+        required: false
+        default: 'toutes'
+permissions:
+  contents: write
+jobs:
+  liste:
+    runs-on: ubuntu-latest
+    outputs:
+      ligues: ${{ steps.l.outputs.ligues }}
+    steps:
+      - id: l
+        run: |
+          if [ "${{ inputs.ligue }}" = "toutes" ] || [ -z "${{ inputs.ligue }}" ]; then
+            echo 'ligues=["fra.1","eng.1","esp.1","ita.1","ger.1","uefa.champions","uefa.europa","uefa.europa.conf","nhl","nba","nfl"]' >> "$GITHUB_OUTPUT"
+          else
+            echo "ligues=[\"${{ inputs.ligue }}\"]" >> "$GITHUB_OUTPUT"
+          fi
+  rattrapage:
+    needs: liste
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        ligue: ${{ fromJson(needs.liste.outputs.ligues) }}
+    concurrency:
+      group: rattrapage-${{ matrix.ligue }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Rattrapage ${{ matrix.ligue }}
+        env:
+          RATTRAPAGE: ${{ matrix.ligue }}
+        run: node .github/scripts/cotes_archive.mjs
+      - name: Enregistrement
+        if: always()
+        run: |
+          git config user.name "Archive cotes"
+          git config user.email "actions@users.noreply.github.com"
+          git add "cotes" 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Rattrapage ${{ matrix.ligue }} (4 saisons)"
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep $((i * 7))
+          done
+          exit 1
