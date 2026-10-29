@@ -1,0 +1,50 @@
+# GONES45 — 📄 PDF de fin de saison (20261031w) : une fois par mois, chaque saison TERMINÉE (à partir de 2026-27) reçoit son PDF de championnat
+# + un PDF par équipe dans pdf/<sport>/<ligue>/<saison>/. Bouton : ligue + saison pour forcer (ex. fra.1 / 2025-26). Voir .github/scripts/pdf_saison.mjs.
+name: pdf-saison
+on:
+  schedule:
+    - cron: '41 5 3 * *'
+  workflow_dispatch:
+    inputs:
+      ligue:
+        description: 'Ligue à forcer (ex. fra.1, nfl) — vide = automatique'
+        required: false
+        default: ''
+      saison:
+        description: 'Saison à forcer (ex. 2025-26, 2026) — vide = toutes'
+        required: false
+        default: ''
+concurrency:
+  group: pdf-saison
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  pdf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Playwright
+        run: npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+      - name: PDF
+        env:
+          PDF_LIGUE: ${{ inputs.ligue }}
+          PDF_SAISON: ${{ inputs.saison }}
+        run: node .github/scripts/pdf_saison.mjs
+      - name: Enregistrement
+        run: |
+          git config user.name "Archive cotes"
+          git config user.email "actions@users.noreply.github.com"
+          git add pdf 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Aucun PDF nouveau"; exit 0; fi
+          git commit -m "📄 PDF de fin de saison $(TZ=Europe/Paris date +'%d/%m')"
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          exit 1

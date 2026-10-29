@@ -11,3 +11,5 @@ Sports : `foot`, `hockey`, `basket`, `football-us`.
   après le match → score et feuille de match (buteurs, passeurs, stats des joueurs).
 - Robot **rattrapage** (à la main) : 4 saisons passées → score, feuille de match, cotes de clôture (1N2, handicap, total).
 - Lu par l'appli (onglet Compétitions → 📦 Cotes gardées). Tout est gratuit (GitHub Actions + fichiers publics).
+
+- Robot **pdf-saison** (le 3 de chaque mois) : PDF de fin de saison par championnat et par équipe dans `pdf/<sport>/<ligue>/<saison>/` (à partir de 2026-27 ; avant : bouton avec ligue + saison).
