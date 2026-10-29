@@ -170,8 +170,23 @@ function feuille(f, sm, sp) {
   const st = {};
   const met = (id, n, k, cle, v) => { if (v == null || v === '' || +v === 0 || isNaN(+v) && cle !== 'TOI' && cle !== 'MIN') return; const o = st[id] || (st[id] = { n, k, s: {} }); o.s[cle] = isNaN(+v) ? v : +v; };
   if (sp === 'soccer') {
+    // 20261031k (« on n'aura plus besoin des archives ESPN ? » → « go, fais en sorte ») : feuille d'ÉQUIPE pour les critères 4 saisons de l'appli,
+    // MÊME format que _g45CrFeuille (app.js) : f.cf = [tirs dom, tirs ext, cadrés dom, cadrés ext, MT dom, MT ext, 1er but 'h'|'a'|'', corners dom,
+    // corners ext, cartons dom, cartons ext] (boxscore.teams[].statistics, header…competitors[].linescores[0], keyEvents scoringPlay).
+    try {
+      const cs = (((sm.header || {}).competitions || [])[0] || {}).competitors || [], ho = cs.find((x) => x.homeAway === 'home'), aw = cs.find((x) => x.homeAway === 'away');
+      if (ho && aw) {
+        const stt = (tid, nm) => { let v = 0; const T = ((sm.boxscore || {}).teams || []).find((t) => t.team && String(t.team.id) === String(tid)); for (const x of (T && T.statistics) || []) if (x.name === nm) v = parseFloat(x.displayValue != null ? x.displayValue : x.value) || 0; return v; };
+        const mt = (x) => { const l = x.linescores || []; return l.length ? (parseInt(l[0].displayValue != null ? l[0].displayValue : l[0].value, 10) || 0) : null; };
+        const bt = (sm.keyEvents || []).find((k) => k.scoringPlay) || {}; let pr = '';
+        if (bt.team) pr = String(bt.team.id) === String(ho.id) ? 'h' : (String(bt.team.id) === String(aw.id) ? 'a' : '');
+        const hS = stt(ho.id, 'totalShots'), aS = stt(aw.id, 'totalShots');
+        if (hS || aS) f.cf = [hS, aS, stt(ho.id, 'shotsOnTarget'), stt(aw.id, 'shotsOnTarget'), mt(ho), mt(aw), pr, stt(ho.id, 'wonCorners'), stt(aw.id, 'wonCorners'),
+          stt(ho.id, 'yellowCards') + stt(ho.id, 'redCards'), stt(aw.id, 'yellowCards') + stt(aw.id, 'redCards')];
+      }
+    } catch (e) {}
     f.bu = (sm.keyEvents || []).filter((x) => x.scoringPlay).map((x) => { const P = x.participants || []; return [String((x.clock || {}).displayValue || ''), String(((P[0] || {}).athlete || {}).id || ''), String(((P[1] || {}).athlete || {}).id || ''), kDe((x.team || {}).id), String(x.shortText || '').slice(0, 60)]; });
-    for (const ro of sm.rosters || []) { const k = kDe((ro.team || {}).id); for (const p of ro.roster || []) { const a = p.athlete || {}; if (!a.id) continue; if (p.starter) met(a.id, a.displayName, k, 'TIT', 1); for (const x of p.stats || []) if (FOOT_ST[x.name]) met(a.id, a.displayName, k, FOOT_ST[x.name], x.value); } }
+    for (const ro of sm.rosters || []) { const k = kDe((ro.team || {}).id); for (const p of ro.roster || []) { const a = p.athlete || {}; if (!a.id) continue; if (p.starter) met(a.id, a.displayName, k, 'TIT', 1); if (p.subbedIn) met(a.id, a.displayName, k, 'REM', 1);   /* 20261031k : entré en jeu (sondé : roster subbedIn true) → présent même sans stat */ for (const x of p.stats || []) if (FOOT_ST[x.name]) met(a.id, a.displayName, k, FOOT_ST[x.name], x.value); } }
   } else {
     const M = US_ST[sp] || {};
     for (const eq of (sm.boxscore || {}).players || []) {
@@ -268,7 +283,8 @@ if (RAT) {
     for (const e of (sb && sb.events) || []) {
       const st = ((e.status || {}).type || {}); if (!st.completed) continue;
       const t = Date.parse(e.date), moE = new Date(t).toISOString().slice(0, 7), F = lireF(moE);
-      if (F[e.id] && F[e.id].f) continue;
+      // 20261031k : foot déjà rattrapé SANS feuille d'équipe (cf) ou sans remplaçants (REM) → relu une fois (mise à niveau des 4 saisons)
+      const vx = F[e.id]; if (vx && vx.f && (sp !== 'soccer' || vx.cf || vx.v2)) continue;
       const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${e.id}`); if (!sm) continue;
       const cp = (((sm.header || {}).competitions) || [])[0] || {}, eq = {}, sc = {};
       for (const c of cp.competitors || []) { const tm = c.team || {}, k = c.homeAway === 'home' ? 'h' : 'a'; eq[k] = { id: String(tm.id || ''), nom: tm.shortDisplayName || tm.displayName || '', ab: tm.abbreviation || '', c: tm.color ? '#' + tm.color : '' }; sc[k] = parseInt(c.score, 10); }
@@ -283,7 +299,9 @@ if (RAT) {
         if (!(f.ml.h > 1 || f.ml.a > 1)) delete f.ml; if (!(f.hc.h > 1 || f.hc.a > 1)) delete f.hc; if (!(f.tot.o > 1 || f.tot.u > 1) || f.tot.L == null) delete f.tot;
       }
       try { feuille(f, sm, sp); } catch (x) {}
-      F[e.id] = f; nouv++;
+      if (sp === 'soccer') f.v2 = 1;   /* lu avec cf + REM (même si ESPN n'a pas de stats d'équipe pour ce match) */
+      if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2 }); if (!vx.f) delete vx.f; } else F[e.id] = f;   /* fiche du direct : ses cotes gardées */
+      nouv++;
       if (++n % 150 === 0) { ecrire(); console.log(`… ${lg} ${n} matchs`); }
       await pause(120);
     }
