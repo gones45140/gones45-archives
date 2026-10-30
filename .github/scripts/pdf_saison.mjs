@@ -41,7 +41,7 @@ function page(L, eq, eqNom, titre, lg0) {
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>body{background:#fff;color:#000;font:14px/1.45 Arial,sans-serif;margin:16px;}h1{font-size:20px;margin:0 0 4px;}.s{font-size:13px;color:#333;margin-bottom:10px;}.b{font-size:15px;font-weight:700;border:2px solid #000;padding:6px 8px;margin:8px 0 12px;}.m{border-top:1px solid #999;padding:6px 0;break-inside:avoid;page-break-inside:avoid;}.t{font-size:15px;}</style></head><body><h1>${esc(titre)}</h1><div class="s">${L.length} match${L.length > 1 ? 's' : ''} · cotes d'avant-match DraftKings (via ESPN) · BET45, PDF de fin de saison du ${new Date().toLocaleDateString('fr-FR')}</div>${bil}${h}</body></html>`;
 }
 const SPN = { foot: 'soccer', hockey: 'hockey', basket: 'basketball', 'football-us': 'football', baseball: 'baseball' };
-const maintenant = Date.now(), FL = process.env.PDF_LIGUE || '', FS = process.env.PDF_SAISON || '';
+const maintenant = Date.now(), TOUT = (process.env.PDF_LIGUE || '') === 'tout', FL = TOUT ? '' : (process.env.PDF_LIGUE || ''), FS = process.env.PDF_SAISON || '';   /* 30/10 : « tout » (Antoine « TOUT ») = toutes les ligues, toutes les saisons FINIES, PDF déjà faits sautés */
 const nav = await chromium.launch(), pg = await nav.newPage();
 let nPdf = 0;
 const imprimer = async (html, chemin) => { fs.mkdirSync(chemin.replace(/\/[^/]+$/, ''), { recursive: true }); await pg.setContent(html, { waitUntil: 'load' }); await pg.pdf({ path: chemin, format: 'A4', margin: { top: '10mm', bottom: '10mm', left: '8mm', right: '8mm' } }); nPdf++; };
@@ -56,7 +56,8 @@ for (const sp of Object.keys(SPN)) {
       const D = lireSaison(sp, lg, sa), L = Object.values(D).filter((x) => x && x.f && x.h && x.a).sort((a, b) => a.t - b.t); if (!L.length) continue;
       const enCours = SA[SA.length - 1] === sa, fini = maintenant - L[L.length - 1].t > 10 * 864e5 && !Object.values(D).some((x) => x && !x.f && x.t > maintenant - 3 * 864e5);
       const dossier = `pdf/${sp}/${lg}/${sa}`, nomLg = NOMS[lg] || lg;
-      if (!FL && (+sa.slice(0, 4) < 2026 || enCours || !fini || fs.existsSync(`${dossier}/${propre(nomLg)}.pdf`))) continue;   /* tout seul : à partir de 2026-27 (cotes complètes) ; avant = sur demande */
+      if (TOUT) { if (enCours || !fini || fs.existsSync(`${dossier}/${propre(nomLg)}.pdf`)) continue; }
+      else if (!FL && (+sa.slice(0, 4) < 2026 || enCours || !fini || fs.existsSync(`${dossier}/${propre(nomLg)}.pdf`))) continue;   /* tout seul : à partir de 2026-27 (cotes complètes) ; avant = sur demande */
       console.log(`📄 ${lg} ${sa} : ${L.length} matchs`);
       await imprimer(page(L, '', '', `BET45 — ${nomLg} ${sa}`, lg), `${dossier}/${propre(nomLg)}.pdf`);
       const eqs = {}; for (const fi of L) for (const k of ['h', 'a']) eqs[fi[k].id] = fi[k].nom;

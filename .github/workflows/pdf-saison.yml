@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ligue:
-        description: 'Ligue à forcer (ex. fra.1, nfl) — vide = automatique'
+        description: 'Ligue à forcer (ex. fra.1, nfl) ; « tout » = toutes les saisons finies de toutes les ligues — vide = automatique'
         required: false
         default: ''
       saison:
