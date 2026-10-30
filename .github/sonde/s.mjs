@@ -1,5 +1,6 @@
-const t = async (n, u) => { try { const r = await fetch(u); const x = await r.text(); console.log(n, r.status, x.slice(0, 300).replace(/\s+/g, ' ')); return x; } catch (e) { console.log(n, 'ERREUR', e.message); } };
-const d = await t('direct', 'https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=Lille');
-await t('worker', 'https://fd-proxy.touraine-antoine.workers.dev?host=tsdb&path=' + encodeURIComponent('/api/v1/json/123/searchteams.php?t=Lille'));
-try { const j = JSON.parse(d); const tm = (j.teams || [])[0] || {}; console.log('fanart', tm.strFanart1, 'banner', tm.strBanner);
-  for (const u of [tm.strFanart1, tm.strBanner].filter(Boolean)) { const r = await fetch(u, { method: 'HEAD' }); console.log('image', r.status, u); } } catch (e) { console.log('json', e.message); }
+for (const q of ['Lille', 'Lille OSC', 'LOSC Lille', 'LOSC', 'Lille Olympique', 'Paris SG', 'Marseille', 'Lyon', 'Lens', 'Nice']) {
+  try { const j = await (await fetch('https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=' + encodeURIComponent(q))).json();
+    console.log(q, '→', (j.teams || []).map(t => t.strTeam + ' [' + t.strSport + '] ' + t.idTeam + (t.strFanart1 ? ' fanart' : '') + (t.strBanner ? ' banner' : '')).join(' | ') || 'rien'); } catch (e) { console.log(q, 'ERREUR', e.message); }
+}
+try { const j = await (await fetch('https://www.thesportsdb.com/api/v1/json/123/search_all_teams.php?l=French%20Ligue%201')).json(); const L = (j.teams || []).find(t => /lille/i.test(t.strTeam)); console.log('ligue → ', (j.teams || []).length, 'équipes', L && (L.strTeam + ' ' + L.idTeam + ' ' + L.strFanart1)); } catch (e) { console.log('ligue', e.message); }
+try { const j = await (await fetch('https://www.thesportsdb.com/api/v1/json/123/lookupteam.php?id=133714')).json(); const t = (j.teams || [])[0] || {}; console.log('lookup 133714 →', t.strTeam, t.strSport, t.strFanart1); } catch (e) { console.log('lookup', e.message); }
