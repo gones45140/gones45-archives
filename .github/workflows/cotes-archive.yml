@@ -21,11 +21,16 @@ jobs:
           node-version: '22'
       - name: Cotes d'avant-match
         run: node .github/scripts/cotes_archive.mjs
+      # 30/10 : 🪞 miroir ESPN (calendriers, résultats, classements) — secours de l'appli si ESPN refuse ; un échec ici ne bloque pas les cotes
+      - name: Miroir ESPN
+        run: node .github/scripts/miroir.mjs
+        continue-on-error: true
+        timeout-minutes: 11
       - name: Enregistrement
         run: |
           git config user.name "Archive cotes"
           git config user.email "actions@users.noreply.github.com"
-          git add "cotes" 2>/dev/null || true
+          git add "cotes" "miroir" 2>/dev/null || true
           if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
           git commit -m "Cotes d'avant-match $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
           for i in 1 2 3 4 5; do
