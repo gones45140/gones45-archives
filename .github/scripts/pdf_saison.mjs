@@ -6,7 +6,7 @@
 import fs from 'fs';
 import { createRequire } from 'module';
 const { chromium } = createRequire(import.meta.url)('playwright');   /* require : marche avec l'installation du robot (npm) comme en local */
-const NOMS = { 'fra.1': 'Ligue 1', 'fra.2': 'Ligue 2', 'eng.1': 'Premier League', 'esp.1': 'Liga', 'ita.1': 'Serie A', 'ger.1': 'Bundesliga', 'ned.1': 'Eredivisie', 'por.1': 'Liga Portugal',
+const NOMS = { '270559': 'Top 14', 'fra.1': 'Ligue 1', 'fra.2': 'Ligue 2', 'eng.1': 'Premier League', 'esp.1': 'Liga', 'ita.1': 'Serie A', 'ger.1': 'Bundesliga', 'ned.1': 'Eredivisie', 'por.1': 'Liga Portugal',
   'bra.1': 'Brasileirao', 'arg.1': 'Argentine', 'uefa.champions': 'Ligue des champions', 'uefa.europa': 'Ligue Europa', 'uefa.europa.conf': 'Ligue Conference', nhl: 'NHL', nba: 'NBA', nfl: 'NFL', mlb: 'MLB',
   'fifa.friendly': 'Matchs amicaux', 'uefa.nations': 'Ligue des nations', 'fifa.worldq.uefa': 'Qualifs Coupe du monde', 'fifa.world': 'Coupe du monde', 'uefa.euro': 'Euro' };
 const EUR = { 'uefa.champions': '🏆 C1', 'uefa.europa': '🥈 C3', 'uefa.europa.conf': '🥉 C4' }, DOM_EU = ['fra.1', 'fra.2', 'eng.1', 'esp.1', 'ita.1', 'ger.1', 'ned.1', 'por.1'];
@@ -40,7 +40,7 @@ function page(L, eq, eqNom, titre, lg0) {
   let bil = ''; if (eq) for (const k of ['L', 'E']) { const b = B[k]; if (!b || !(b.V + b.N + b.D)) continue; bil += `<div class="b">Bilan ${esc(eqNom)}${B.E ? (k === 'L' ? ' — ' + esc(NOMS[lg0] || lg0) : ' — Europe (' + Object.keys(b.x).join(', ') + ')') : ''} : ${b.V} V · ${b.N} N · ${b.D} D — ${b.p} marqués, ${b.c} encaissés</div>`; }
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(titre)}</title><style>body{background:#fff;color:#000;font:14px/1.45 Arial,sans-serif;margin:16px;}h1{font-size:20px;margin:0 0 4px;}.s{font-size:13px;color:#333;margin-bottom:10px;}.b{font-size:15px;font-weight:700;border:2px solid #000;padding:6px 8px;margin:8px 0 12px;}.m{border-top:1px solid #999;padding:6px 0;break-inside:avoid;page-break-inside:avoid;}.t{font-size:15px;}</style></head><body><h1>${esc(titre)}</h1><div class="s">${L.length} match${L.length > 1 ? 's' : ''} · cotes d'avant-match DraftKings (via ESPN) · BET45, PDF de fin de saison du ${new Date().toLocaleDateString('fr-FR')}</div>${bil}${h}</body></html>`;
 }
-const SPN = { foot: 'soccer', hockey: 'hockey', basket: 'basketball', 'football-us': 'football', baseball: 'baseball' };
+const SPN = { foot: 'soccer', hockey: 'hockey', basket: 'basketball', 'football-us': 'football', baseball: 'baseball', rugby: 'rugby' };
 const maintenant = Date.now(), TOUT = (process.env.PDF_LIGUE || '') === 'tout', FL = TOUT ? '' : (process.env.PDF_LIGUE || ''), FS = process.env.PDF_SAISON || '';   /* 30/10 : « tout » (Antoine « TOUT ») = toutes les ligues, toutes les saisons FINIES, PDF déjà faits sautés */
 const nav = await chromium.launch(), pg = await nav.newPage();
 let nPdf = 0;

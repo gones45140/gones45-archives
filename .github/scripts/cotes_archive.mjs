@@ -13,7 +13,9 @@ const LIGUES = [
   ['hockey', 'nhl'], ['basketball', 'nba'], ['football', 'nfl'],
   // 20261031d (« il manque rien ? » → ligues ESPN du mur d'Antoine : Dodgers, PSV, Palmeiras, Boca, France… « ok ») :
   ['baseball', 'mlb'], ['soccer', 'ned.1'], ['soccer', 'por.1'], ['soccer', 'fra.2'], ['soccer', 'bra.1'], ['soccer', 'arg.1'],
-  ['soccer', 'fifa.friendly'], ['soccer', 'uefa.nations'], ['soccer', 'fifa.worldq.uefa'], ['soccer', 'fifa.world'], ['soccer', 'uefa.euro']
+  ['soccer', 'fifa.friendly'], ['soccer', 'uefa.nations'], ['soccer', 'fifa.worldq.uefa'], ['soccer', 'fifa.world'], ['soccer', 'uefa.euro'],
+  // 30/10 (« en rugby rien n'est monté ? » → Top 14 « oui ») : ESPN 270559 = calendrier, scores, compos (23 numéros) ; ni cotes, ni essais (sondé)
+  ['rugby', '270559']
 ];
 // saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
 const CIVIL = new Set(['mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
@@ -26,7 +28,7 @@ const FENETRE = 8 * 3600e3;
 // 20261031b (« vu qu'on fait tous les sports, faut classer par sport, championnat, équipe / joueur ») : rangement
 // cotes/<sport>/<ligue>/<saison>/matchs/AAAA-MM.json + index recalculés à chaque passage : equipes.json, equipes/<id>.json (matchs de l'équipe),
 // joueurs.json, joueurs/<idEspn>.json (historique du joueur : stats de la feuille + cotes gardées). Ancien rangement cotes/<ligue>/ migré.
-const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us', baseball: 'baseball' };
+const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us', baseball: 'baseball', rugby: 'rugby' };
 const BASE = (sp, lg) => `cotes/${SPN[sp]}/${lg}`;
 // 20261031c (« ça sera classé par saison ? ») : saison = juillet → juin pour tous les sports (2026-27 = 07/2026 → 06/2027, NFL comprise)
 const SAISON = (mo, lg) => { if (CIVIL.has(lg)) return mo.slice(0, 4); const y = +mo.slice(0, 4), m = +mo.slice(5, 7); return m >= 7 ? y + '-' + String(y + 1).slice(2) : (y - 1) + '-' + String(y).slice(2); };
@@ -200,6 +202,11 @@ function feuille(f, sm, sp, id) {
     } catch (e) {}
     f.bu = (sm.keyEvents || []).filter((x) => x.scoringPlay).map((x) => { const P = x.participants || []; return [String((x.clock || {}).displayValue || ''), String(((P[0] || {}).athlete || {}).id || ''), String(((P[1] || {}).athlete || {}).id || ''), kDe((x.team || {}).id), String(x.shortText || '').slice(0, 60)]; });
     for (const ro of sm.rosters || []) { const k = kDe((ro.team || {}).id); for (const p of ro.roster || []) { const a = p.athlete || {}; if (!a.id) continue; if (p.starter) met(a.id, a.displayName, k, 'TIT', 1); if (p.subbedIn) met(a.id, a.displayName, k, 'REM', 1);   /* 20261031k : entré en jeu (sondé : roster subbedIn true) → présent même sans stat */ for (const x of p.stats || []) if (FOOT_ST[x.name]) met(a.id, a.displayName, k, FOOT_ST[x.name], x.value); } }
+  } else if (sp === 'rugby') {
+    // 30/10 : SONDÉ (La Rochelle – Bordeaux-Bègles) : boxscore / keyEvents / scoringPlays VIDES ; rosters = 23 par équipe, jersey 1-15 = titulaires
+    // (starter toujours false chez ESPN) → s.N = numéro, TIT (1-15) ou REMP (16-23, entrée non connue)
+    for (const ro of sm.rosters || []) { const k = kDe((ro.team || {}).id); for (const p of ro.roster || []) { const a = p.athlete || {}, n = parseInt(p.jersey, 10); if (!a.id || !n) continue;
+      const o = st[a.id] || (st[a.id] = { n: a.displayName || '', k, s: {} }); o.s.N = n; o.s[n <= 15 ? 'TIT' : 'REMP'] = 1; } }
   } else {
     const M = US_ST[sp] || {};
     for (const eq of (sm.boxscore || {}).players || []) {

@@ -15,7 +15,8 @@ const LIGUES = [
   ['soccer', 'uefa.champions'], ['soccer', 'uefa.europa'], ['soccer', 'uefa.europa.conf'],
   ['hockey', 'nhl'], ['basketball', 'nba'], ['football', 'nfl'], ['baseball', 'mlb'],
   ['soccer', 'ned.1'], ['soccer', 'por.1'], ['soccer', 'fra.2'], ['soccer', 'bra.1'], ['soccer', 'arg.1'],
-  ['soccer', 'uefa.nations'], ['soccer', 'fifa.worldq.uefa'], ['soccer', 'fifa.friendly']
+  ['soccer', 'uefa.nations'], ['soccer', 'fifa.worldq.uefa'], ['soccer', 'fifa.friendly'],
+  ['rugby', '270559']   // 30/10 : Top 14 (classement : ?season= obligatoire, sans lui ESPN rend 2022-23 — sondé)
 ];
 const HOTES = ['https://site.web.api.espn.com', 'https://site.api.espn.com'];
 const RETIRER = new Set(['links', 'headlines', 'geoBroadcasts', 'broadcasts', 'tickets', 'uid', 'guid']);
@@ -94,6 +95,6 @@ await passe(resumes, async (x) => {
   if (j && j.header) { const o = {}; RES_GARDER.forEach(k => { if (j[k] != null) o[k] = j[k]; }); ecrire(x.f, alleger(o)); }
 });
 console.log(`miroir : ${resumes.length} résumés (compos) relus`);
-await passe(classements, async (x) => { const s = await lire(`/apis/v2/sports/${x.sp}/${x.lg}/standings`); if (s && (s.children || s.standings)) ecrire(x.f, alleger(s)); });
+await passe(classements, async (x) => { const s = await lire(`/apis/v2/sports/${x.sp}/${x.lg}/standings` + (x.sp === 'rugby' ? '?season=' + (new Date().getUTCMonth() >= 6 ? new Date().getUTCFullYear() + 1 : new Date().getUTCFullYear()) : '')); if (s && (s.children || s.standings)) ecrire(x.f, alleger(s)); });
 await passe(autres, jour);
 console.log(`miroir : ${travail.length} jours à relire, ${classements.length} classements ; ${nReq} demandes, ${nEcrits} fichiers écrits, ${nErreurs} échecs, ${Math.round((Date.now() - T0) / 1000)} s`);
