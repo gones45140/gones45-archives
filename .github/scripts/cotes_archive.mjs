@@ -47,17 +47,25 @@ function indexer(sp, lg) {   /* une passe par saison présente */
 }
 function indexerSaison(sp, lg, sa) {
   const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
-  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 4 };   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
+  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 5 };   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
       if (x.f) { ETAT.n++; if (x.v2) ETAT.v2++; }
       for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '']);   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
-      const ids = new Set([...Object.keys(x.st || {}), ...Object.keys(x.j || {})]);
+      /* 30/10 : m[7] = étiquette du match où le joueur N'A PAS joué — 'B' banc, 'A:<statut> <motif>' absent annoncé, 'D:<raison>' n'a pas
+         joué (US) ; m[4] reste null (l'appli ne compte comme joués que les matchs avec stats → les séries ne changent pas). */
+      const tag = {}, nomT = {}, cotT = {};
+      for (const b of x.banc || []) { tag[b[0]] = 'B'; nomT[b[0]] = b[1]; cotT[b[0]] = b[2]; }
+      for (const b of x.dnp || []) { tag[b[0]] = 'D:' + (b[3] || ''); nomT[b[0]] = b[1]; cotT[b[0]] = b[2]; }
+      for (const b of x.abs || []) { tag[b[0]] = 'A:' + [b[3], b[4]].filter(Boolean).join(' '); nomT[b[0]] = b[1]; cotT[b[0]] = b[2]; }
+      const ids = new Set([...Object.keys(x.st || {}), ...Object.keys(x.j || {}), ...Object.keys(tag)]);
       for (const pid of ids) {
-        const st = (x.st || {})[pid], jc = (x.j || {})[pid], k = (st && st.k) || (jc && jc.k) || ''; if (!k) continue;
-        const j = JO[pid] || (JO[pid] = { n: (st && st.n) || (jc && jc.n) || '', eq: (x[k] || {}).id || '', m: [] });
-        j.eq = (x[k] || {}).id || j.eq; j.m.push([x.t, mo, id, (x[k] || {}).id || '', st ? st.s : null, jc ? jc.o : null, k]);   /* 20261031o : + côté h|a (Séries individuelles 🏠 / ✈️) */
+        const st = (x.st || {})[pid], jc = (x.j || {})[pid], k = (st && st.k) || (jc && jc.k) || cotT[pid] || ''; if (!k) continue;
+        const j = JO[pid] || (JO[pid] = { n: (st && st.n) || (jc && jc.n) || nomT[pid] || '', eq: (x[k] || {}).id || '', m: [] });
+        const ligne = [x.t, mo, id, (x[k] || {}).id || '', st ? st.s : null, jc ? jc.o : null, k];   /* 20261031o : + côté h|a (Séries individuelles 🏠 / ✈️) */
+        if (!st && tag[pid]) ligne.push(tag[pid]);
+        j.eq = (x[k] || {}).id || j.eq; j.m.push(ligne);
       }
     }
   }
