@@ -170,7 +170,7 @@ const US_ST = {
 // 20261031l (critères NHL / NBA / NFL sur les archives) : SONDÉ (robot sonde, 29/10) scoreboard events[].season { year, type 1 présaison / 2 saison
 // régulière / 3 séries } ; status.type.detail « Final », « Final/OT », « Final/SO », « Final/2OT » → fiche.ty, fiche.ot (même règle que l'appli : SO 2, OT 1).
 const otDe = (d) => (/\bSO\b/.test(d || '') ? 2 : (/\bOT\b/.test(d || '') ? 1 : 0));
-function feuille(f, sm, sp) {
+function feuille(f, sm, sp, id) {
   const kDe = (tid) => (String(tid) === String(f.h.id) ? 'h' : (String(tid) === String(f.a.id) ? 'a' : ''));
   const st = {};
   const met = (id, n, k, cle, v) => { if (v == null || v === '' || +v === 0 || isNaN(+v) && cle !== 'TOI' && cle !== 'MIN') return; const o = st[id] || (st[id] = { n, k, s: {} }); o.s[cle] = isNaN(+v) ? v : +v; };
@@ -209,6 +209,28 @@ function feuille(f, sm, sp) {
     if (sp === 'football') f.bu = (sm.scoringPlays || []).map((x) => [String(((x.period || {}).number || '')) + 'QT ' + String((x.clock || {}).displayValue || ''), '', '', kDe((x.team || {}).id), String(x.text || '').slice(0, 70)]);
   }
   if (Object.keys(st).length) f.st = st;
+  /* 30/10 (Antoine : « on sait les joueurs de chaque équipe qui jouent, même absents de dernière minute ? » → « oui ») :
+     f.banc = remplaçants restés sur le banc (foot : rosters ni titulaire ni entré) [[id, nom, côté]] ;
+     f.abs  = absents annoncés par ESPN (injuries, résumé du match ou copie d'avant-match du miroir) [[id, nom, côté, statut O|DD|Q…, motif]]
+              — ESPN n'en publie PAS pour le foot (vérifié le 30/10 sur 7 matchs), seulement NBA / NHL / NFL / MLB ;
+     f.dnp  = sports US : n'a pas joué, avec la raison d'ESPN (didNotPlay / reason) [[id, nom, côté, raison]]. */
+  try {
+    if (sp === 'soccer') {
+      const banc = [];
+      for (const ro of sm.rosters || []) { const k = kDe((ro.team || {}).id); for (const p of ro.roster || []) { const a = p.athlete || {}; if (a.id && !p.starter && !p.subbedIn) banc.push([String(a.id), a.displayName || '', k]); } }
+      if (banc.length) f.banc = banc;
+    } else {
+      const dnp = [];
+      for (const eq of (sm.boxscore || {}).players || []) { const k = kDe((eq.team || {}).id); for (const cat of eq.statistics || []) for (const a of cat.athletes || []) { const at = a.athlete || {}; if (at.id && a.didNotPlay && !dnp.some((x) => x[0] === String(at.id))) dnp.push([String(at.id), at.displayName || '', k, String(a.reason || '').slice(0, 40)]); } }
+      if (dnp.length) f.dnp = dnp;
+    }
+    let inj = sm.injuries;
+    if (!(inj && inj.length) && id) { try { inj = (JSON.parse(fs.readFileSync(`miroir/${sp}/${f.lg}/resumes/${id}.json`, 'utf8')) || {}).injuries; } catch (e) {} }
+    const abs = [];
+    for (const T of inj || []) { const k = kDe((T.team || {}).id); for (const i of T.injuries || []) { const a = i.athlete || {}; if (!a.id) continue; const d = i.details || {};
+      abs.push([String(a.id), a.displayName || '', k, ((i.type || {}).abbreviation || i.status || ''), [d.type, d.detail].filter((x) => x && x !== 'Not Specified').join(' ').slice(0, 30)]); } }
+    if (abs.length) f.abs = abs;
+  } catch (e) {}
 }
 // 20261030z : score final des matchs gardés (onglet « 📦 Cotes gardées » : carte verte / jaune / rouge) — mois en cours et précédent,
 // matchs commencés depuis plus de 3 h sans score → summary ESPN (header.competitions[0].competitors[].score, match fini seulement).
@@ -226,7 +248,7 @@ for (const [sp, lg] of LIGUES) {
       if (!st.completed) continue;
       const sc = {}; for (const c of cp.competitors || []) sc[c.homeAway === 'home' ? 'h' : 'a'] = parseInt(c.score, 10);
       if (!isNaN(sc.h) && !isNaN(sc.a)) { f.f = sc; maj = true; nSc++; f.ot = otDe(st.detail || st.shortDetail); }
-      try { feuille(f, sm, sp); } catch (e) { console.log('feuille ' + id + ' : ' + e.message); }
+      try { feuille(f, sm, sp, id); } catch (e) { console.log('feuille ' + id + ' : ' + e.message); }
       f.v2 = 1;   /* 20261031k / n : feuille complète */
       await pause(200);
     }
@@ -310,7 +332,7 @@ if (RAT) {
         const ou = parseFloat(o.overUnder); f.tot = { L: isNaN(ou) ? null : ou, o: dec(o.overOdds), u: dec(o.underOdds) };
         if (!(f.ml.h > 1 || f.ml.a > 1)) delete f.ml; if (!(f.hc.h > 1 || f.hc.a > 1)) delete f.hc; if (!(f.tot.o > 1 || f.tot.u > 1) || f.tot.L == null) delete f.tot;
       }
-      try { feuille(f, sm, sp); } catch (x) {}
+      try { feuille(f, sm, sp, String(e.id)); } catch (x) {}
       f.v2 = 1;   /* lu avec cf + REM / présence J (même si ESPN n'a pas de stats d'équipe pour ce match) */
       if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2, ty: tyE, ot: otE }); if (!vx.f) delete vx.f; } else F[e.id] = f;   /* fiche du direct : ses cotes gardées */
       nouv++;
