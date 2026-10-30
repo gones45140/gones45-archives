@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 412, height: 900 } });
 const err = []; p.on('pageerror', e => err.push(e.message));
+await p.route(/espn\.com/, async r => { try { const res = await r.fetch(); const h = { ...res.headers(), 'access-control-allow-origin': '*' }; await r.fulfill({ response: res, headers: h }); } catch (e) { await r.abort(); } });
 await p.goto('https://gones45140.github.io/gones45/index.html?v=' + Date.now(), { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(8000);
 const r = await p.evaluate(async () => {
