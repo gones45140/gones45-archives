@@ -76,6 +76,24 @@ const jour = async (x) => {
   if (j && Array.isArray(j.events)) ecrire(x.f, alleger({ leagues: j.leagues, season: j.season, day: j.day, events: j.events }));
 };
 await passe(proches, jour);
+// 30/10 (Antoine : « les compos, important non ? » → « oui ») : RÉSUMÉS des matchs qui commencent dans les 2 h (ou ont commencé il y a
+// moins de 2 h) → compos (rosters), absents (injuries), en-tête, gameInfo ; relus à chaque passage tant qu'ils sont dans la fenêtre
+// (la compo sort ~1 h avant). miroir/<sp>/<lg>/resumes/<eid>.json ; effacés après 3 jours. Commentaires, actions, articles, vidéos retirés.
+const RES_GARDER = ['header', 'rosters', 'injuries', 'gameInfo', 'boxscore', 'format', 'lastFiveGames', 'headToHeadGames', 'seasonseries', 'predictor', 'odds', 'pickcenter', 'standings', 'leaders', 'keyEvents'];
+const resumes = [];
+for (const [sp, lg] of LIGUES) {
+  const dos = `miroir/${sp}/${lg}`;
+  for (const k of [-1, 0, 1]) {
+    const a = lireFichier(`${dos}/jours/${ymd(auj + k * 864e5)}.json`);
+    ((a && a.events) || []).forEach(e => { const t = Date.parse(e.date); if (t && t - auj < 2 * 3600e3 && auj - t < 2 * 3600e3) resumes.push({ sp, lg, id: String(e.id), f: `${dos}/resumes/${e.id}.json` }); });
+  }
+  try { for (const n of fs.readdirSync(`${dos}/resumes`)) { const f = `${dos}/resumes/${n}`, r = lireFichier(f); if (!r || !r._m || auj - r._m.t > 3 * 864e5) { fs.unlinkSync(f); nEcrits++; } } } catch (e) {}
+}
+await passe(resumes, async (x) => {
+  const j = await lire(`/apis/site/v2/sports/${x.sp}/${x.lg}/summary?event=${x.id}`);
+  if (j && j.header) { const o = {}; RES_GARDER.forEach(k => { if (j[k] != null) o[k] = j[k]; }); ecrire(x.f, alleger(o)); }
+});
+console.log(`miroir : ${resumes.length} résumés (compos) relus`);
 await passe(classements, async (x) => { const s = await lire(`/apis/v2/sports/${x.sp}/${x.lg}/standings`); if (s && (s.children || s.standings)) ecrire(x.f, alleger(s)); });
 await passe(autres, jour);
 console.log(`miroir : ${travail.length} jours à relire, ${classements.length} classements ; ${nReq} demandes, ${nEcrits} fichiers écrits, ${nErreurs} échecs, ${Math.round((Date.now() - T0) / 1000)} s`);
