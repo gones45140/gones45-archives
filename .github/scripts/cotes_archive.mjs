@@ -320,7 +320,7 @@ if (!RAT) console.log(`📦 cotes gardées : ${nEv} match(s), ${nJ} joueur(s) av
 // (le passage peut être relancé sans tout refaire). Enregistrement tous les 150 matchs (un arrêt ne perd presque rien).
 if (RAT) {
   const L = LIGUES.find((x) => x[1] === RAT); if (!L) { console.log('ligue inconnue ' + RAT); process.exit(0); }
-  const [sp, lg] = L, debut = new Date(Date.UTC(new Date(maintenant).getUTCFullYear() - 4, 6, 1)), mois = [];
+  const [sp, lg] = L, debut = new Date(Date.UTC(new Date(maintenant).getUTCFullYear() - (+process.env.RAT_ANS || 4), 6, 1)), mois = [];   /* 20261102i : RAT_ANS=5 → 1 saison de plus (foot, Antoine : « rajoute une saison supplémentaire mais seulement au foot » ; sondé : 2021-22 = résultats + feuilles, PAS de cotes) */
   for (const d = new Date(debut); d.getTime() < maintenant; d.setUTCMonth(d.getUTCMonth() + 1)) mois.push(d.toISOString().slice(0, 7));
   const fic = {}, lireF = (mo) => { if (!fic[mo]) { try { fic[mo] = JSON.parse(fs.readFileSync(FMOIS(sp, lg, mo), 'utf8')); } catch (e) { fic[mo] = {}; } } return fic[mo]; };
   const ecrire = () => { for (const [mo, F] of Object.entries(fic)) if (Object.keys(F).length) { const p = FMOIS(sp, lg, mo); fs.mkdirSync(p.replace(/\/[^/]+$/, ''), { recursive: true }); fs.writeFileSync(p, JSON.stringify(F)); } };

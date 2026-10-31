@@ -8,6 +8,10 @@ on:
         description: 'Une ou plusieurs ligues séparées par des virgules (fra.1,nhl…) ou « toutes »'
         required: false
         default: 'toutes'
+      ans:
+        description: 'Nombre de saisons en arrière (4 ; 5 pour le foot depuis 20261102i)'
+        required: false
+        default: '4'
 permissions:
   contents: write
 jobs:
@@ -42,6 +46,7 @@ jobs:
       - name: Rattrapage ${{ matrix.ligue }}
         env:
           RATTRAPAGE: ${{ matrix.ligue }}
+          RAT_ANS: ${{ inputs.ans }}
         run: node .github/scripts/cotes_archive.mjs
       - name: Enregistrement
         if: always()
