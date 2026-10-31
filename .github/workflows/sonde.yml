@@ -1,0 +1,14 @@
+name: sonde
+on: workflow_dispatch
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          node -e '
+          (async()=>{for(const lg of ["fra.1","eng.1","uefa.champions","bra.1"]){for(const mo of ["202110","202203"]){
+            const r=await fetch("https://site.api.espn.com/apis/site/v2/sports/soccer/"+lg+"/scoreboard?dates="+mo+"&limit=1000");const j=await r.json().catch(()=>({}));
+            const ev=(j.events||[]).filter(e=>e.status&&e.status.type&&e.status.type.completed);
+            let x="";if(ev[0]){const s=await (await fetch("https://site.api.espn.com/apis/site/v2/sports/soccer/"+lg+"/summary?event="+ev[0].id)).json().catch(()=>({}));
+              x=" pick="+JSON.stringify((s.pickcenter||[]).slice(0,1).map(p=>({p:p.provider&&p.provider.name,h:p.homeTeamOdds&&p.homeTeamOdds.moneyLine,ou:p.overUnder}))) +" rosters="+((s.rosters||[]).map(r=>(r.roster||[]).length).join("/"))+" keyEv="+((s.keyEvents||[]).length);}
+            console.log(lg,mo,r.status,"fini="+ev.length,ev[0]?ev[0].name:"",x);}}})()'
