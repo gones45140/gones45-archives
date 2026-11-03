@@ -389,7 +389,9 @@ if (HCL) {
             const it = (j.items || []).filter((x) => x && !/live/i.test((x.provider || {}).name || '')).sort((a, b) => rang(a) - rang(b));
             /* 20261103j : ligne PRINCIPALE seulement = cotes des deux côtés entre 1,50 et 2,70 (Bet365 / Betfair donnaient parfois 4,5 buts ou 1,5) */
             const eq2 = (a, b) => { const x = dec(a), y = dec(b); return x >= 1.5 && x <= 2.7 && y >= 1.5 && y <= 2.7; };
-            const oS = it.find((x) => !isNaN(parseFloat(x.spread)) && eq2((x.homeTeamOdds || {}).spreadOdds, (x.awayTeamOdds || {}).spreadOdds)), oT = it.find((x) => !isNaN(parseFloat(x.overUnder)) && eq2(x.overOdds, x.underOdds)), oM = it.find((x) => dec((x.homeTeamOdds || {}).moneyLine) > 1 || dec((x.awayTeamOdds || {}).moneyLine) > 1);
+            /* hockey : le « puck line » ±1,5 a des cotes déséquilibrées par nature (ex. 2,40 / 1,57) → fourchette 1,15-4,00 pour le handicap NHL */
+            const eqS = sp === 'hockey' ? (a, b) => { const x = dec(a), y = dec(b); return x >= 1.15 && x <= 4 && y >= 1.15 && y <= 4; } : eq2;
+            const oS = it.find((x) => !isNaN(parseFloat(x.spread)) && eqS((x.homeTeamOdds || {}).spreadOdds, (x.awayTeamOdds || {}).spreadOdds)), oT = it.find((x) => !isNaN(parseFloat(x.overUnder)) && eq2(x.overOdds, x.underOdds)), oM = it.find((x) => dec((x.homeTeamOdds || {}).moneyLine) > 1 || dec((x.awayTeamOdds || {}).moneyLine) > 1);
             if (!(x0.hc && x0.hc.L != null) && oS) { x0.hc = { L: parseFloat(oS.spread), h: dec((oS.homeTeamOdds || {}).spreadOdds), a: dec((oS.awayTeamOdds || {}).spreadOdds), src: 'core' }; ok++; }
             if (!(x0.tot && x0.tot.L != null) && oT) x0.tot = { L: parseFloat(oT.overUnder), o: dec(oT.overOdds), u: dec(oT.underOdds), src: 'core' };   /* 20261103d */
             if (!(x0.ml && (x0.ml.h > 1 || x0.ml.a > 1)) && oM) { x0.ml = { h: dec((oM.homeTeamOdds || {}).moneyLine), a: dec((oM.awayTeamOdds || {}).moneyLine), d: dec((oM.drawOdds || {}).moneyLine), src: 'core' }; okm++; }   /* 20261103i */
