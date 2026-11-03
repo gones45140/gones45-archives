@@ -17,7 +17,9 @@ const LIGUES = [
   // 30/10 (« en rugby rien n'est monté ? » → Top 14 « oui ») : ESPN 270559 = calendrier, scores, compos (23 numéros) ; ni cotes, ni essais (sondé)
   ['rugby', '270559'],
   // 20261103k (sondes du 03/11 → « oui ») : stats joueurs rugby DISPONIBLES (essais…) ; + Champions Cup, Six Nations, NRL (rugby à XIII)
-  ['rugby', '271937'], ['rugby', '180659'], ['rugby-league', '3']
+  ['rugby', '271937'], ['rugby', '180659'], ['rugby-league', '3'],
+  // 20261103m (console d'Antoine : Challenge Cup ESPN = 500 par équipe dans l'appli) : + Challenge Cup, lue par l'appli comme la Champions Cup
+  ['rugby', '272073']
 ];
 // saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
 const CIVIL = new Set(['180659', '3', 'mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
