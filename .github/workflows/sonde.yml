@@ -1,0 +1,19 @@
+name: sonde
+on: workflow_dispatch
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat > s.mjs <<'JS'
+          const J=async u=>{try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}};
+          for(const [lg,d] of [['fra.1','20261101'],['fra.1','20240310'],['eng.1','20261101']]){
+            const sb=await J('https://site.api.espn.com/apis/site/v2/sports/soccer/'+lg+'/scoreboard?dates='+d); const e=(sb&&sb.events||[]).find(x=>x.status&&x.status.type&&x.status.type.completed); if(!e){console.log(lg,d,'rien');continue;}
+            const sm=await J('https://site.api.espn.com/apis/site/v2/sports/soccer/'+lg+'/summary?event='+e.id);
+            const out=[]; const walk=(o,p)=>{ if(!o||typeof o!=='object')return; if(Array.isArray(o)){o.forEach((x,i)=>walk(x,p+'['+i+']'));return;} if(o.name==='expectedGoals'||o.name==='expectedAssists') out.push(p+' = '+JSON.stringify({n:o.name,v:o.value,d:o.displayValue})); for(const k in o) walk(o[k],p+'.'+k); };
+            walk(sm,'');
+            console.log(lg,d,e.name,'occurrences',out.length); out.slice(0,6).forEach(x=>console.log('  ',x.slice(0,220)));
+            const nz=out.filter(x=>!/"v":0[,}]/.test(x)); console.log('  non nuls',nz.length, nz.slice(0,3).join(' || ').slice(0,400));
+          }
+          JS
+          node s.mjs
