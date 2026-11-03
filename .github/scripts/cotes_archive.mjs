@@ -188,6 +188,24 @@ const US_ST = {
 // 20261031l (critères NHL / NBA / NFL sur les archives) : SONDÉ (robot sonde, 29/10) scoreboard events[].season { year, type 1 présaison / 2 saison
 // régulière / 3 séries } ; status.type.detail « Final », « Final/OT », « Final/SO », « Final/2OT » → fiche.ty, fiche.ot (même règle que l'appli : SO 2, OT 1).
 const otDe = (d) => (/\bSO\b/.test(d || '') ? 2 : (/\bOT\b/.test(d || '') ? 1 : 0));
+/* 20261103l (Antoine : « on peut rien trouver pour cette année ? ») — ESPN n'a plus les stats joueurs du Top 14 depuis 2024-25 (summary.rosters sans
+   stats), MAIS SONDÉ le 03/11 (Toulon – La Rochelle 602697) : core …/events/<id>/competitions/<id>/plays = 52 actions { type.text « try »,
+   « yellow card »…, participants[0].athlete.$ref …/athletes/<id> } → essais / cartons / transformations / pénalités comptés par joueur quand la
+   feuille n'a aucun essai (E). Points refaits (XV : 5 / 2 / 3 / 3 ; XIII : 4 / 2 / 2 / 1). ESPN seulement (CGU LNR : usage privé). */
+async function rugbyActions(f, sp, lg, id) {
+  if (sp !== 'rugby' && sp !== 'rugby-league') return;
+  const st = f.st || (f.st = {}); if (Object.values(st).some((o) => o.s && o.s.E)) return;
+  const j = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${id}/competitions/${id}/plays?limit=400`); if (!j || !j.items) return;
+  const T = { try: 'E', 'penalty try': 'E', conversion: 'TR', 'penalty goal': 'PEN', 'drop goal': 'DROP', 'yellow card': 'J', 'red card': 'R' };
+  const XIII = sp === 'rugby-league', PT = { E: XIII ? 4 : 5, TR: 2, PEN: XIII ? 2 : 3, DROP: XIII ? 1 : 3 };
+  let n = 0;
+  for (const x of j.items) {
+    const c = T[String((x.type || {}).text || '').toLowerCase()]; if (!c) continue;
+    const m = String((((x.participants || [])[0] || {}).athlete || {}).$ref || '').match(/athletes\/(\d+)/); if (!m) continue;
+    const o = st[m[1]] || (st[m[1]] = { n: '', k: '', s: {} }); o.s[c] = (o.s[c] || 0) + 1; if (PT[c]) o.s.PTS = (o.s.PTS || 0) + PT[c]; n++;
+  }
+  if (n) f.ac = 1;   /* stats venues des actions (plays) */
+}
 function feuille(f, sm, sp, id) {
   const kDe = (tid) => (String(tid) === String(f.h.id) ? 'h' : (String(tid) === String(f.a.id) ? 'a' : ''));
   const st = {};
@@ -276,6 +294,7 @@ for (const [sp, lg] of LIGUES) {
       const sc = {}; for (const c of cp.competitors || []) sc[c.homeAway === 'home' ? 'h' : 'a'] = parseInt(c.score, 10);
       if (!isNaN(sc.h) && !isNaN(sc.a)) { f.f = sc; maj = true; nSc++; f.ot = otDe(st.detail || st.shortDetail); }
       try { feuille(f, sm, sp, id); } catch (e) { console.log('feuille ' + id + ' : ' + e.message); }
+      try { await rugbyActions(f, sp, lg, id); } catch (e) {}   /* 20261103l */
       f.v2 = 1;   /* 20261031k / n : feuille complète */
       await pause(200);
     }
@@ -429,7 +448,8 @@ if (RAT) {
       if (vx && vx.ty == null && tyE) { vx.ty = tyE; vx.ot = otE; }   /* 20261031l : type de match + prolongation, sans relire la feuille */
       /* 20261103k : v3 = feuille avec stats rugby (essais…) / xG foot (RAT_XG=1) → les anciennes fiches de ces sports sont relues une fois */
       const V3 = sp === 'rugby' || sp === 'rugby-league' || (sp === 'soccer' && !!process.env.RAT_XG);
-      if (vx && vx.f && vx.v2 && (vx.v3 || !V3)) continue;   /* 20261031n : v2 = feuille complète (foot cf + REM, US présence J, MLB batting / pitching) ; sinon relue une fois */
+      const sansE = (sp === 'rugby' || sp === 'rugby-league') && vx && !vx.ac && !Object.values(vx.st || {}).some((o) => o.s && o.s.E);   /* 20261103l : rugby sans essai → relu (actions) */
+      if (vx && vx.f && vx.v2 && (vx.v3 || !V3) && !sansE) continue;   /* 20261031n : v2 = feuille complète (foot cf + REM, US présence J, MLB batting / pitching) ; sinon relue une fois */
       const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${e.id}`); if (!sm) continue;
       const cp = (((sm.header || {}).competitions) || [])[0] || {}, eq = {}, sc = {};
       for (const c of cp.competitors || []) { const tm = c.team || {}, k = c.homeAway === 'home' ? 'h' : 'a'; eq[k] = { id: String(tm.id || ''), nom: tm.shortDisplayName || tm.displayName || '', ab: tm.abbreviation || '', c: tm.color ? '#' + tm.color : '' }; sc[k] = parseInt(c.score, 10); }
@@ -444,9 +464,10 @@ if (RAT) {
         if (!(f.ml.h > 1 || f.ml.a > 1)) delete f.ml; if (!(f.hc.h > 1 || f.hc.a > 1)) delete f.hc; if (!(f.tot.o > 1 || f.tot.u > 1) || f.tot.L == null) delete f.tot;
       }
       try { feuille(f, sm, sp, String(e.id)); } catch (x) {}
+      try { await rugbyActions(f, sp, lg, String(e.id)); } catch (x) {}   /* 20261103l */
       f.v2 = 1;   /* lu avec cf + REM / présence J (même si ESPN n'a pas de stats d'équipe pour ce match) */
       if (V3) f.v3 = 1;   /* 20261103k */
-      if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2, v3: f.v3, ty: tyE, ot: otE }); if (!vx.f) delete vx.f; if (!vx.v3) delete vx.v3; }
+      if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2, v3: f.v3, ac: f.ac, ty: tyE, ot: otE }); if (!vx.f) delete vx.f; if (!vx.v3) delete vx.v3; if (!vx.ac) delete vx.ac; }
       else { if (vx) for (const k of ['ml', 'hc', 'tot', 'teq', 'j', 'bts', 'pro', 'hcv']) if (f[k] == null && vx[k] != null) f[k] = vx[k]; F[e.id] = f; }   /* fiche du direct : ses cotes gardées ; 20261103k : fiche rattrapée relue → ses cotes « core » gardées aussi */
       nouv++;
       if (++n % 150 === 0) { ecrire(); console.log(`… ${lg} ${n} matchs`); }
