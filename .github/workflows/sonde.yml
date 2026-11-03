@@ -7,7 +7,7 @@ jobs:
       - run: |
           node -e '
           (async()=>{const J=async u=>{try{const r=await fetch(u);return [r.status, r.ok?await r.json():null]}catch(e){return [0,null]}};
-          for(const id of ["401909917","401584893"]){
+          for(const id of ["401909917"]){
             let [s2,b]=await J("https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/"+id+"/competitions/"+id+"/odds");
             const it=(b&&b.items||[]).filter(x=>!/live/i.test((x.provider||{}).name||""))[0]||{};
             console.log(id,"core item keys",Object.keys(it).join(","));
@@ -15,5 +15,5 @@ jobs:
             console.log(id,"homeTeamOdds",JSON.stringify(it.homeTeamOdds||{}).slice(0,500));
             let [s3,p]=await J("https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba/events/"+id+"/competitions/"+id+"/odds/"+((it.provider||{}).id||"58")+"/propBets?limit=1000");
             const ty={};((p&&p.items)||[]).forEach(x=>{const k=(x.type&&x.type.id)+":"+(x.type&&x.type.name);ty[k]=(ty[k]||0)+1;});
-            console.log(id,"propBets",s3,JSON.stringify(ty).slice(0,700));
+            Object.keys(ty).forEach(k=>console.log("TYPE",k,ty[k])); const tt=((p&&p.items)||[]).filter(x=>/team/i.test((x.type&&x.type.name)||"")).slice(0,4); console.log("TEAM",JSON.stringify(tt.map(x=>({t:x.type,a:x.athlete&&x.athlete.$ref,team:x.team,odds:x.odds,cur:x.current}))).slice(0,900));
           }})()'
