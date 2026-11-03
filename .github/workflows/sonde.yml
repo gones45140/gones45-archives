@@ -6,23 +6,9 @@ jobs:
     steps:
       - run: |
           cat > s.mjs <<'JS'
-          const T=async u=>{try{const r=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0 (GONES45 archive)'}});return [r.status,await r.text()]}catch(e){return [0,'']}};
-          const dec=s=>s.replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/&#039;/g,"'");
-          for(const [h,sa] of [['top14.lnr.fr','2024-2025'],['top14.lnr.fr','2025-2026'],['prod2.lnr.fr','2024-2025']]){
-            const [s1,t]=await T('https://'+h+'/calendrier-et-resultats/'+sa+'/j1');
-            const L=[...new Set((t.match(/\/feuille-de-match\/[^"'?#\s]+/g)||[]))];
-            console.log(h,sa,'j1',s1,'liens feuilles',L.length,L.slice(0,2).join(' '));
-            if(!L[0]) continue;
-            const base=L[0].replace(/\/statistiques-du-match$/,'');
-            const [s2,f]=await T('https://'+h+base);
-            const gf=(f.match(/:game-facts="([^"]*)"/)||[])[1];
-            let ess=[];try{ess=JSON.parse(dec(gf||'[]')).filter(x=>/Essai/i.test(x.subtype||'')).map(x=>[(x.player||{}).firstName,(x.player||{}).lastName,x.club,x.minute])}catch(e){}
-            console.log(' feuille',s2,'essais timeline',JSON.stringify(ess).slice(0,300));
-            const [s3,g]=await T('https://'+h+base+'/statistiques-du-match');
-            const R=[...g.matchAll(/:ranking="([^"]*)"/g)].map(m=>{try{return JSON.parse(dec(m[1]))}catch(e){return null}});
-            console.log(' stats',s3,'blocs',R.length,'clés',R[0]&&R[0][0]?Object.keys(R[0][0]).join(','):'-');
-            console.log(' marqueurs',JSON.stringify((R[0]||[]).concat(R[1]||[]).filter(p=>+p.nbEssais>0).map(p=>[p.player&&p.player.name,p.nbEssais])).slice(0,300));
-          }
-          const [s4,cg]=await T('https://www.lnr.fr/mentions-legales'); console.log('mentions',s4,(cg.replace(/<[^>]+>/g,' ').match(/.{0,200}(reproduction|extraction|utilis)[^.]{0,250}/i)||[''])[0].replace(/\s+/g,' '));
+          const r=await fetch('https://www.lnr.fr/mentions-legales',{headers:{'User-Agent':'Mozilla/5.0 (GONES45 archive)'}}); const t=(await r.text()).replace(/<script[\s\S]*?<\/script>/g,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ');
+          const i=t.indexOf('CONDITIONS GENERALES'); const c=t.slice(i);
+          const hits=[...c.matchAll(/[^.]{0,300}(extraction|extraire|aspir|robot|automatis|réutilis|reproduction|propriété intellectuelle|base de données|données)[^.]{0,300}\./gi)].map(m=>m[0]);
+          console.log('longueur CGU',c.length); hits.slice(0,12).forEach(h=>console.log('»',h.trim()));
           JS
           node s.mjs
