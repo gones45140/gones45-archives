@@ -15,10 +15,12 @@ const LIGUES = [
   ['baseball', 'mlb'], ['soccer', 'ned.1'], ['soccer', 'por.1'], ['soccer', 'fra.2'], ['soccer', 'bra.1'], ['soccer', 'arg.1'],
   ['soccer', 'fifa.friendly'], ['soccer', 'uefa.nations'], ['soccer', 'fifa.worldq.uefa'], ['soccer', 'fifa.world'], ['soccer', 'uefa.euro'],
   // 30/10 (« en rugby rien n'est monté ? » → Top 14 « oui ») : ESPN 270559 = calendrier, scores, compos (23 numéros) ; ni cotes, ni essais (sondé)
-  ['rugby', '270559']
+  ['rugby', '270559'],
+  // 20261103k (sondes du 03/11 → « oui ») : stats joueurs rugby DISPONIBLES (essais…) ; + Champions Cup, Six Nations, NRL (rugby à XIII)
+  ['rugby', '271937'], ['rugby', '180659'], ['rugby-league', '3']
 ];
 // saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
-const CIVIL = new Set(['mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
+const CIVIL = new Set(['180659', '3', 'mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
 // types propBets gardés (sondés par Antoine, 30/10) : joueurs + buts d'équipe + les deux marquent
 /* 20261103f (Antoine : « total pts équipe il propose un cut ? » → « oui ») — NBA en plus, SONDÉ le 03/11 (Jazz @ Spurs 401909917) : 98 Team Total
    Points (ligne du total d'une ÉQUIPE, rangée comme les buts d'équipe → fiche.teq), et les VRAIES lignes over / under des joueurs : 1 Total Points,
@@ -34,7 +36,7 @@ const FENETRE = 8 * 3600e3;
 // 20261031b (« vu qu'on fait tous les sports, faut classer par sport, championnat, équipe / joueur ») : rangement
 // cotes/<sport>/<ligue>/<saison>/matchs/AAAA-MM.json + index recalculés à chaque passage : equipes.json, equipes/<id>.json (matchs de l'équipe),
 // joueurs.json, joueurs/<idEspn>.json (historique du joueur : stats de la feuille + cotes gardées). Ancien rangement cotes/<ligue>/ migré.
-const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us', baseball: 'baseball', rugby: 'rugby' };
+const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us', baseball: 'baseball', rugby: 'rugby', 'rugby-league': 'rugby-xiii' };
 const BASE = (sp, lg) => `cotes/${SPN[sp]}/${lg}`;
 // 20261031c (« ça sera classé par saison ? ») : saison = juillet → juin pour tous les sports (2026-27 = 07/2026 → 06/2027, NFL comprise)
 const SAISON = (mo, lg) => { if (CIVIL.has(lg)) return mo.slice(0, 4); const y = +mo.slice(0, 4), m = +mo.slice(5, 7); return m >= 7 ? y + '-' + String(y + 1).slice(2) : (y - 1) + '-' + String(y).slice(2); };
@@ -176,7 +178,7 @@ for (const [cle, F] of Object.entries(fichiers)) {
 //  NBA    boxscore.players[].statistics (une catégorie) [MIN, PTS, FG, 3PT, FT, REB, AST, TO, STL, BLK…]
 //  NFL    boxscore.players[].statistics passing / rushing / receiving / interceptions… (labels YDS, TD, REC, INT) + scoringPlays
 // → f.st = { idEspn: { n, k (h|a), s: { stat: valeur ≠ 0 } } } (stats choisies par sport, valeurs nulles non gardées).
-const FOOT_ST = { totalGoals: 'G', goalAssists: 'A', totalShots: 'T', shotsOnTarget: 'TC', yellowCards: 'J', redCards: 'R', foulsCommitted: 'F', offsides: 'HJ', saves: 'AR', ownGoals: 'CSC' };
+const FOOT_ST = { expectedGoals: 'XG', expectedAssists: 'XA', totalGoals: 'G', goalAssists: 'A', totalShots: 'T', shotsOnTarget: 'TC', yellowCards: 'J', redCards: 'R', foulsCommitted: 'F', offsides: 'HJ', saves: 'AR', ownGoals: 'CSC' };
 const US_ST = {
   hockey: { G: 'G', A: 'A', SOG: 'TC', PIM: 'PIM', '+/-': 'PM', SV: 'AR', GA: 'BE', TOI: 'TOI' },
   basketball: { MIN: 'MIN', PTS: 'PTS', REB: 'REB', AST: 'AST', '3PT': '3PT', STL: 'INT', BLK: 'CTR', TO: 'BP' },
@@ -208,11 +210,15 @@ function feuille(f, sm, sp, id) {
     } catch (e) {}
     f.bu = (sm.keyEvents || []).filter((x) => x.scoringPlay).map((x) => { const P = x.participants || []; return [String((x.clock || {}).displayValue || ''), String(((P[0] || {}).athlete || {}).id || ''), String(((P[1] || {}).athlete || {}).id || ''), kDe((x.team || {}).id), String(x.shortText || '').slice(0, 60)]; });
     for (const ro of sm.rosters || []) { const k = kDe((ro.team || {}).id); for (const p of ro.roster || []) { const a = p.athlete || {}; if (!a.id) continue; if (p.starter) met(a.id, a.displayName, k, 'TIT', 1); if (p.subbedIn) met(a.id, a.displayName, k, 'REM', 1);   /* 20261031k : entré en jeu (sondé : roster subbedIn true) → présent même sans stat */ for (const x of p.stats || []) if (FOOT_ST[x.name]) met(a.id, a.displayName, k, FOOT_ST[x.name], x.value); } }
-  } else if (sp === 'rugby') {
+  } else if (sp === 'rugby' || sp === 'rugby-league') {
     // 30/10 : SONDÉ (La Rochelle – Bordeaux-Bègles) : boxscore / keyEvents / scoringPlays VIDES ; rosters = 23 par équipe, jersey 1-15 = titulaires
     // (starter toujours false chez ESPN) → s.N = numéro, TIT (1-15) ou REMP (16-23, entrée non connue)
+    // 20261103k : SONDÉ (Top 14, Six Nations, NRL) — roster[].stats a maintenant tries, tryAssists, points, conversionGoals, penaltyGoals… ; XIII :
+    // titulaires 1-13. E essais, PE passes d'essai, PTS points, TR transformations, PEN pénalités, DROP, J / R cartons, M mètres, PL plaquages, FR franchissements.
+    const RG = { tries: 'E', tryAssists: 'PE', points: 'PTS', conversionGoals: 'TR', penaltyGoals: 'PEN', dropGoalsConverted: 'DROP', yellowCards: 'J', redCards: 'R', metres: 'M', tackles: 'PL', cleanBreaks: 'FR' }, NT = sp === 'rugby-league' ? 13 : 15;
     for (const ro of sm.rosters || []) { const k = kDe((ro.team || {}).id); for (const p of ro.roster || []) { const a = p.athlete || {}, n = parseInt(p.jersey, 10); if (!a.id || !n) continue;
-      const o = st[a.id] || (st[a.id] = { n: a.displayName || '', k, s: {} }); o.s.N = n; o.s[n <= 15 ? 'TIT' : 'REMP'] = 1; } }
+      const o = st[a.id] || (st[a.id] = { n: a.displayName || '', k, s: {} }); o.s.N = n; o.s[n <= NT ? 'TIT' : 'REMP'] = 1;
+      for (const x of p.stats || []) { const c = RG[x.name], v = +x.value; if (c && v) o.s[c] = v; } } }
   } else {
     const M = US_ST[sp] || {};
     for (const eq of (sm.boxscore || {}).players || []) {
@@ -421,7 +427,9 @@ if (RAT) {
       // 20261031k : foot déjà rattrapé SANS feuille d'équipe (cf) ou sans remplaçants (REM) → relu une fois (mise à niveau des 4 saisons)
       const vx = F[e.id], tyE = (e.season || {}).type || 0, otE = otDe(st.detail || st.shortDetail);
       if (vx && vx.ty == null && tyE) { vx.ty = tyE; vx.ot = otE; }   /* 20261031l : type de match + prolongation, sans relire la feuille */
-      if (vx && vx.f && vx.v2) continue;   /* 20261031n : v2 = feuille complète (foot cf + REM, US présence J, MLB batting / pitching) ; sinon relue une fois */
+      /* 20261103k : v3 = feuille avec stats rugby (essais…) / xG foot (RAT_XG=1) → les anciennes fiches de ces sports sont relues une fois */
+      const V3 = sp === 'rugby' || sp === 'rugby-league' || (sp === 'soccer' && !!process.env.RAT_XG);
+      if (vx && vx.f && vx.v2 && (vx.v3 || !V3)) continue;   /* 20261031n : v2 = feuille complète (foot cf + REM, US présence J, MLB batting / pitching) ; sinon relue une fois */
       const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${e.id}`); if (!sm) continue;
       const cp = (((sm.header || {}).competitions) || [])[0] || {}, eq = {}, sc = {};
       for (const c of cp.competitors || []) { const tm = c.team || {}, k = c.homeAway === 'home' ? 'h' : 'a'; eq[k] = { id: String(tm.id || ''), nom: tm.shortDisplayName || tm.displayName || '', ab: tm.abbreviation || '', c: tm.color ? '#' + tm.color : '' }; sc[k] = parseInt(c.score, 10); }
@@ -437,7 +445,9 @@ if (RAT) {
       }
       try { feuille(f, sm, sp, String(e.id)); } catch (x) {}
       f.v2 = 1;   /* lu avec cf + REM / présence J (même si ESPN n'a pas de stats d'équipe pour ce match) */
-      if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2, ty: tyE, ot: otE }); if (!vx.f) delete vx.f; } else F[e.id] = f;   /* fiche du direct : ses cotes gardées */
+      if (V3) f.v3 = 1;   /* 20261103k */
+      if (vx && !vx.r) { Object.assign(vx, { f: f.f || vx.f, bu: f.bu, st: f.st, cf: f.cf, v2: f.v2, v3: f.v3, ty: tyE, ot: otE }); if (!vx.f) delete vx.f; if (!vx.v3) delete vx.v3; }
+      else { if (vx) for (const k of ['ml', 'hc', 'tot', 'teq', 'j', 'bts', 'pro', 'hcv']) if (f[k] == null && vx[k] != null) f[k] = vx[k]; F[e.id] = f; }   /* fiche du direct : ses cotes gardées ; 20261103k : fiche rattrapée relue → ses cotes « core » gardées aussi */
       nouv++;
       if (++n % 150 === 0) { ecrire(); console.log(`… ${lg} ${n} matchs`); }
       await pause(120);
