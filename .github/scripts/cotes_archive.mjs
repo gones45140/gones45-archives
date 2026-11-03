@@ -20,6 +20,12 @@ const LIGUES = [
 // saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
 const CIVIL = new Set(['mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
 // types propBets gardés (sondés par Antoine, 30/10) : joueurs + buts d'équipe + les deux marquent
+/* 20261103f (Antoine : « total pts équipe il propose un cut ? » → « oui ») — NBA en plus, SONDÉ le 03/11 (Jazz @ Spurs 401909917) : 98 Team Total
+   Points (ligne du total d'une ÉQUIPE, rangée comme les buts d'équipe → fiche.teq), et les VRAIES lignes over / under des joueurs : 1 Total Points,
+   2 Total Assists, 3 Total Rebounds, 4 Total 3-Point FG, 87 pts + passes, 88 pts + reb, 89 passes + reb, 90 pts + reb + passes (→ fiche.j[id].o).
+   Basket seulement (les mêmes numéros peuvent vouloir dire autre chose ailleurs). Anciennes saisons : propBets = 404. */
+const TYPES_NBA = new Set(['98', '1', '2', '3', '4', '87', '88', '89', '90']);
+const typeOk = (sp, t) => TYPES.has(t) || (sp === 'basketball' && TYPES_NBA.has(t));
 const TYPES = new Set(['230', '39', '40', '219', '218', '232', '264', '31', '32', '33', '220', '221', '225', '226', '227', '327', '151', '253', '152', '153']);   /* 20261031x : 153 = « prolongation ? » (cote du OUI, NHL) → fiche.pro (1N2 60 min estimé) */
 // 20261031f : 8 h au lieu de 4 h (Antoine : « on a pas les cotes des joueurs, faudra les garder ») → un passage de 2 h sauté par
 // GitHub (fréquent sur un dépôt neuf) ne fait plus perdre un match ; chaque passage réécrit la fiche, la dernière avant le coup d'envoi reste.
@@ -49,12 +55,12 @@ function indexer(sp, lg) {   /* une passe par saison présente */
 }
 function indexerSaison(sp, lg, sa) {
   const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
-  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 7 };   /* 20261103d : iv 7 = total m[9] */   /* 20261103b : iv 6 = handicap m[8] dans les équipes */   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
+  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 8 };   /* 20261103f : iv 8 = total d'équipe m[10] */   /* 20261103d : iv 7 = total m[9] */   /* 20261103b : iv 6 = handicap m[8] dans les équipes */   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
       if (x.f) { ETAT.n++; if (x.v2) ETAT.v2++; }
-      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null, (x.tot && x.tot.L != null && !isNaN(+x.tot.L)) ? +x.tot.L : null]);   /* 20261103d : m[9] = total du match (ligne du book) */   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
+      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null, (x.tot && x.tot.L != null && !isNaN(+x.tot.L)) ? +x.tot.L : null, (x.teq && x.teq[k] && x.teq[k].length && x.teq[k][0][0] != null) ? +x.teq[k][0][0] : null]);   /* 20261103f : m[10] = total de l'équipe (ligne du book) */   /* 20261103d : m[9] = total du match (ligne du book) */   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
       /* 30/10 : m[7] = étiquette du match où le joueur N'A PAS joué — 'B' banc, 'A:<statut> <motif>' absent annoncé, 'D:<raison>' n'a pas
          joué (US) ; m[4] reste null (l'appli ne compte comme joués que les matchs avec stats → les séries ne changent pas). */
       const tag = {}, nomT = {}, cotT = {};
@@ -96,7 +102,7 @@ const cotePb = (x) => { let d = dec((x.odds || {}).decimal); const ov = (x.curre
 const maintenant = Date.now(), fichiers = {};
 let nEv = 0, nJ = 0;
 // 20261031a : RATTRAPAGE=<ligue> (bouton du robot, 4 saisons passées) → seulement la partie rattrapage, en fin de fichier
-const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE ? 'hc' : '');   /* 20261103b : HC_LIGUE saute aussi le passage normal */
+const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE ? 'hc' : '');   /* 20261103b : HC_LIGUE saute aussi le passage normal */
 for (const [sp, lg] of (RAT ? [] : LIGUES)) {
   const jours = [0, 1].map((k) => new Date(maintenant + k * 864e5).toISOString().slice(0, 10).replace(/-/g, ''));
   const vus = new Set();
@@ -120,7 +126,7 @@ for (const [sp, lg] of (RAT ? [] : LIGUES)) {
       }
       // propBets + noms
       const pb = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${e.id}/competitions/${e.id}/odds/100/propBets?limit=500`);
-      const items = ((pb && pb.items) || []).filter((x) => TYPES.has(String((x.type || {}).id)));
+      const items = ((pb && pb.items) || []).filter((x) => typeOk(sp, String((x.type || {}).id)));
       if (items.length) {
         const noms = {};
         for (const k of ['h', 'a']) {
@@ -135,7 +141,7 @@ for (const [sp, lg] of (RAT ? [] : LIGUES)) {
           const tg = parseFloat(((x.current || {}).target || {}).value), cible = isNaN(tg) ? null : tg;
           if (ty === '152') { B.push(d); continue; }
           if (ty === '153') { fiche.pro = d; continue; }
-          if (ty === '151' || ty === '253') { const tm = String((x.team || {}).$ref || '').match(/teams\/(\d+)/); const k = tm && tm[1] === fiche.h.id ? 'h' : (tm && tm[1] === fiche.a.id ? 'a' : ''); if (k && cible != null) T[k].push([cible, d]); continue; }
+          if (ty === '151' || ty === '253' || (sp === 'basketball' && ty === '98')) {   /* 20261103f : 98 = total de points d'une équipe NBA */ const tm = String((x.team || {}).$ref || '').match(/teams\/(\d+)/); const k = tm && tm[1] === fiche.h.id ? 'h' : (tm && tm[1] === fiche.a.id ? 'a' : ''); if (k && cible != null) T[k].push([cible, d]); continue; }
           const a = String((x.athlete || {}).$ref || '').match(/athletes\/(\d+)/); if (!a) continue;
           const nm = noms[a[1]]; if (!nm || !nm[0]) continue;
           const jj = J[a[1]] || (J[a[1]] = { n: nm[0], k: nm[1], o: {} }); (jj.o[ty] = jj.o[ty] || []).push([cible, d]);
@@ -273,7 +279,7 @@ for (const [sp, lg] of LIGUES) {
 }   /* fin !RAT */
 if (!RAT) for (const x of touchees) { const [sp, lg] = x.split('|'); indexer(sp, lg); }
 // 20261031k : saison sans etat.json (indexée avant ce fichier, ex. par un rattrapage plus ancien) → réindexée une fois
-if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) { let et = null; try { et = JSON.parse(fs.readFileSync(`${BASE(sp, lg)}/${sa}/etat.json`, 'utf8')); } catch (e) {} if (!et || !(et.iv >= 7)) indexerSaison(sp, lg, sa);   /* 20261103b : iv 6 (handicap m[8]) → toutes les saisons réindexées une fois */ } }   /* 20261031o : index plus ancien → refait */
+if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) { let et = null; try { et = JSON.parse(fs.readFileSync(`${BASE(sp, lg)}/${sa}/etat.json`, 'utf8')); } catch (e) {} if (!et || !(et.iv >= 8)) indexerSaison(sp, lg, sa);   /* 20261103b : iv 6 (handicap m[8]) → toutes les saisons réindexées une fois */ } }   /* 20261031o : index plus ancien → refait */
 if (!RAT) console.log(`📦 scores ajoutés : ${nSc}`);
 // ═══ 20261031h — ↪️ CARRIÈRES (Antoine : « attention, lors d'un transfert… » puis « et les archives le savent ? »). Chaque match note déjà le club
 // du joueur CE jour-là, mais un joueur qui change de championnat (Lyon → Chelsea) avait 2 fiches sans lien. Fiche CENTRALE par sport :
@@ -323,6 +329,37 @@ if (!RAT) console.log(`📦 cotes gardées : ${nEv} match(s), ${nJ} joueur(s) av
 // …/events/<id>/competitions/<id>/odds = 200, items[] { provider.name, spread (= ligne de l'équipe à DOMICILE : « CLE −12.5 » → −12.5 ;
 // « PHI −4.5 » PHI à l'extérieur → +4.5), overUnder }. HC_LIGUE=nba → chaque match fini sans hc.L : 1er fournisseur hors « Live » (ESPN BET,
 // DraftKings, Caesars… dans cet ordre de préférence) → fiche.hc = { L, h, a, src: 'core' } (h / a = cotes si données), puis index refait.
+// 20261103f — PB_LIGUE=nba : matchs de la saison EN COURS sans total d'équipe → propBets DraftKings (100) relus (ESPN les garde après le match,
+// vérifié Jazz @ Spurs le lendemain) : 98 → fiche.teq ; lignes joueurs 1-4 / 87-90 ajoutées à fiche.j (nom pris dans la feuille st si besoin).
+const PBL = process.env.PB_LIGUE || '';
+if (PBL) {
+  const L = LIGUES.find((x) => x[1] === PBL); if (!L) { console.log('ligue inconnue ' + PBL); process.exit(0); }
+  const [sp, lg] = L, B = BASE(sp, lg); let sas = []; try { sas = fs.readdirSync(B).filter((d) => /^\d{4}(-\d{2})?$/.test(d)).sort(); } catch (e) {}
+  const sa = sas[sas.length - 1]; let F = []; try { F = fs.readdirSync(`${B}/${sa}/matchs`).filter((f) => /\.json$/.test(f)); } catch (e) {}
+  let n = 0, ok = 0, nj = 0;
+  for (const f of F) {
+    const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
+    const ids = Object.keys(D).filter((id) => !D[id].teq && D[id].t < maintenant); if (!ids.length) continue;
+    for (const id of ids) {
+      n++; const x0 = D[id], pb = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${id}/competitions/${id}/odds/100/propBets?limit=1000`);
+      const T = { h: [], a: [] };
+      for (const x of (pb && pb.items) || []) {
+        const ty = String((x.type || {}).id); if (!TYPES_NBA.has(ty)) continue;
+        const d = cotePb(x); if (!d) continue; const tg = parseFloat(((x.current || {}).target || {}).value), cible = isNaN(tg) ? null : tg;
+        if (ty === '98') { const tm = String((x.team || {}).$ref || '').match(/teams\/(\d+)/); const k = tm && tm[1] === (x0.h || {}).id ? 'h' : (tm && tm[1] === (x0.a || {}).id ? 'a' : ''); if (k && cible != null) T[k].push([cible, d]); continue; }
+        const a = String((x.athlete || {}).$ref || '').match(/athletes\/(\d+)/); if (!a) continue;
+        const st = (x0.st || {})[a[1]], J = x0.j || (x0.j = {}), jj = J[a[1]] || (J[a[1]] = { n: (st && st.n) || '', k: (st && st.k) || '', o: {} });
+        if (!jj.o[ty]) { jj.o[ty] = []; nj++; } jj.o[ty].push([cible, d]);
+      }
+      if (T.h.length || T.a.length) { x0.teq = T; ok++; }
+      if (x0.j && !Object.keys(x0.j).length) delete x0.j;
+    }
+    fs.writeFileSync(p, JSON.stringify(D));
+  }
+  console.log(`📈 ${lg} ${sa} : ${ok} totaux d'équipe sur ${n} matchs relus, ${nj} lignes joueurs ajoutées`);
+  indexer(sp, lg);
+  process.exit(0);
+}
 const HCL = process.env.HC_LIGUE || '';
 if (HCL) {
   const L = LIGUES.find((x) => x[1] === HCL); if (!L) { console.log('ligue inconnue ' + HCL); process.exit(0); }
