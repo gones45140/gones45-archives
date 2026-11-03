@@ -8,7 +8,7 @@ on:
         required: false
         default: 'nba'
       mode:
-        description: 'handicaps (anciennes saisons) ou propbets (saison en cours : total équipe + lignes joueurs)'
+        description: 'handicaps (anciennes saisons), refaire (relit les lignes core) ou propbets (saison en cours : total équipe + lignes joueurs)'
         required: false
         default: 'handicaps'
 permissions:
@@ -28,6 +28,7 @@ jobs:
         env:
           HC_LIGUE: ${{ inputs.mode == 'propbets' && '' || inputs.ligue }}
           PB_LIGUE: ${{ inputs.mode == 'propbets' && inputs.ligue || '' }}
+          HC_REFAIRE: ${{ inputs.mode == 'refaire' && '1' || '' }}
         run: node .github/scripts/cotes_archive.mjs
       - name: Enregistrement
         if: always()

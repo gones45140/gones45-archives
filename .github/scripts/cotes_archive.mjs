@@ -380,13 +380,16 @@ if (HCL) {
       for (const f of F) {
         const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
         const manque = (x) => !(x.hc && x.hc.L != null) || !(x.tot && x.tot.L != null) || !(x.ml && (x.ml.h > 1 || x.ml.a > 1));
+        if (process.env.HC_REFAIRE) for (const x of Object.values(D)) { if (x.tot && x.tot.src === 'core') delete x.tot; if (x.hc && x.hc.src === 'core') delete x.hc; delete x.hcv; }   /* 20261103j : refaire les lignes « core » avec la règle de la ligne principale */
         const ids = Object.keys(D).filter((id) => D[id].f && manque(D[id]) && !D[id].hcv); if (!ids.length) continue;   /* hcv : déjà demandé, rien chez ESPN */
         for (let i = 0; i < ids.length; i += 6) {
           await Promise.all(ids.slice(i, i + 6).map(async (id) => {
             n++; const j = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${id}/competitions/${id}/odds`);
             if (!j) return; const x0 = D[id];
             const it = (j.items || []).filter((x) => x && !/live/i.test((x.provider || {}).name || '')).sort((a, b) => rang(a) - rang(b));
-            const oS = it.find((x) => !isNaN(parseFloat(x.spread))), oT = it.find((x) => !isNaN(parseFloat(x.overUnder))), oM = it.find((x) => dec((x.homeTeamOdds || {}).moneyLine) > 1 || dec((x.awayTeamOdds || {}).moneyLine) > 1);
+            /* 20261103j : ligne PRINCIPALE seulement = cotes des deux côtés entre 1,50 et 2,70 (Bet365 / Betfair donnaient parfois 4,5 buts ou 1,5) */
+            const eq2 = (a, b) => { const x = dec(a), y = dec(b); return x >= 1.5 && x <= 2.7 && y >= 1.5 && y <= 2.7; };
+            const oS = it.find((x) => !isNaN(parseFloat(x.spread)) && eq2((x.homeTeamOdds || {}).spreadOdds, (x.awayTeamOdds || {}).spreadOdds)), oT = it.find((x) => !isNaN(parseFloat(x.overUnder)) && eq2(x.overOdds, x.underOdds)), oM = it.find((x) => dec((x.homeTeamOdds || {}).moneyLine) > 1 || dec((x.awayTeamOdds || {}).moneyLine) > 1);
             if (!(x0.hc && x0.hc.L != null) && oS) { x0.hc = { L: parseFloat(oS.spread), h: dec((oS.homeTeamOdds || {}).spreadOdds), a: dec((oS.awayTeamOdds || {}).spreadOdds), src: 'core' }; ok++; }
             if (!(x0.tot && x0.tot.L != null) && oT) x0.tot = { L: parseFloat(oT.overUnder), o: dec(oT.overOdds), u: dec(oT.underOdds), src: 'core' };   /* 20261103d */
             if (!(x0.ml && (x0.ml.h > 1 || x0.ml.a > 1)) && oM) { x0.ml = { h: dec((oM.homeTeamOdds || {}).moneyLine), a: dec((oM.awayTeamOdds || {}).moneyLine), d: dec((oM.drawOdds || {}).moneyLine), src: 'core' }; okm++; }   /* 20261103i */
