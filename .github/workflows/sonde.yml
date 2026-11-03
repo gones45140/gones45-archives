@@ -1,0 +1,22 @@
+name: sonde
+on: workflow_dispatch
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat > s.mjs <<'JS'
+          const J=async u=>{try{const r=await fetch(u);const t=await r.text();let j=null;try{j=JSON.parse(t)}catch(e){};return [r.status,j,t]}catch(e){return [0,null,'']}};
+          const E='602697', B='https://sports.core.api.espn.com/v2/sports/rugby/leagues/270559/events/'+E+'/competitions/'+E;
+          let [s1,c]=await J(B); console.log('competition',s1,Object.keys(c||{}).join(','));
+          let [s2,p]=await J(B+'/plays?limit=300'); console.log('plays',s2,p&&p.count,JSON.stringify((p&&p.items||[]).slice(0,3).map(x=>({t:x.type&&x.type.text,txt:x.text,part:x.participants}))).slice(0,500));
+          let [s3,d]=await J(B+'/details?limit=300'); console.log('details',s3,d&&d.count,JSON.stringify((d&&d.items||[]).slice(0,3)).slice(0,500));
+          let [s4,r]=await J(B+'/competitors/25986/roster'); console.log('roster',s4,r&&r.count||(r&&r.entries||[]).length);
+          const e0=(r&&r.entries||[])[0]; if(e0){console.log(' entrée',JSON.stringify(e0).slice(0,400)); if(e0.statistics&&e0.statistics.$ref){const [s5,st]=await J(e0.statistics.$ref); console.log(' stats joueur',s5,JSON.stringify(st).slice(0,600));}}
+          let [s6,st2]=await J(B+'/competitors/25986/statistics'); console.log('stats équipe',s6,JSON.stringify(st2).slice(0,400));
+          let [s7,sm]=await J('https://site.web.api.espn.com/apis/site/v2/sports/rugby/270559/summary?event='+E); console.log('summary web',s7,Object.keys(sm||{}).join(','),'stats1',JSON.stringify(((((sm||{}).rosters||[])[0]||{}).roster||[])[0]?.stats||null).slice(0,150));
+          let [s8,pb]=await J('https://site.web.api.espn.com/apis/site/v2/sports/rugby/270559/playbyplay?event='+E); console.log('playbyplay',s8,JSON.stringify(pb).slice(0,300));
+          let [s9,tl]=await J('https://www.thesportsdb.com/api/v1/json/123/eventsseason.php?id=4430&s=2025-2026'); const ev=(tl&&tl.events||[])[0]; console.log('tsdb saison',s9,ev&&ev.strEvent,ev&&ev.idEvent);
+          if(ev){let [sa,a]=await J('https://www.thesportsdb.com/api/v1/json/123/lookuptimeline.php?id='+ev.idEvent); console.log('tsdb timeline',sa,JSON.stringify(a).slice(0,300)); let [sb,b]=await J('https://www.thesportsdb.com/api/v1/json/123/lookupeventstats.php?id='+ev.idEvent); console.log('tsdb stats',sb,JSON.stringify(b).slice(0,300));}
+          JS
+          node s.mjs
