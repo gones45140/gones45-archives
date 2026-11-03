@@ -49,12 +49,12 @@ function indexer(sp, lg) {   /* une passe par saison présente */
 }
 function indexerSaison(sp, lg, sa) {
   const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
-  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 5 };   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
+  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 6 };   /* 20261103b : iv 6 = handicap m[8] dans les équipes */   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
       if (x.f) { ETAT.n++; if (x.v2) ETAT.v2++; }
-      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '']);   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
+      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null]);   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
       /* 30/10 : m[7] = étiquette du match où le joueur N'A PAS joué — 'B' banc, 'A:<statut> <motif>' absent annoncé, 'D:<raison>' n'a pas
          joué (US) ; m[4] reste null (l'appli ne compte comme joués que les matchs avec stats → les séries ne changent pas). */
       const tag = {}, nomT = {}, cotT = {};
@@ -96,7 +96,7 @@ const cotePb = (x) => { let d = dec((x.odds || {}).decimal); const ov = (x.curre
 const maintenant = Date.now(), fichiers = {};
 let nEv = 0, nJ = 0;
 // 20261031a : RATTRAPAGE=<ligue> (bouton du robot, 4 saisons passées) → seulement la partie rattrapage, en fin de fichier
-const RAT = process.env.RATTRAPAGE || '';
+const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE ? 'hc' : '');   /* 20261103b : HC_LIGUE saute aussi le passage normal */
 for (const [sp, lg] of (RAT ? [] : LIGUES)) {
   const jours = [0, 1].map((k) => new Date(maintenant + k * 864e5).toISOString().slice(0, 10).replace(/-/g, ''));
   const vus = new Set();
@@ -273,7 +273,7 @@ for (const [sp, lg] of LIGUES) {
 }   /* fin !RAT */
 if (!RAT) for (const x of touchees) { const [sp, lg] = x.split('|'); indexer(sp, lg); }
 // 20261031k : saison sans etat.json (indexée avant ce fichier, ex. par un rattrapage plus ancien) → réindexée une fois
-if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) { let et = null; try { et = JSON.parse(fs.readFileSync(`${BASE(sp, lg)}/${sa}/etat.json`, 'utf8')); } catch (e) {} if (!et || !(et.iv >= 4)) indexerSaison(sp, lg, sa); } }   /* 20261031o : index plus ancien → refait */
+if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) { let et = null; try { et = JSON.parse(fs.readFileSync(`${BASE(sp, lg)}/${sa}/etat.json`, 'utf8')); } catch (e) {} if (!et || !(et.iv >= 6)) indexerSaison(sp, lg, sa);   /* 20261103b : iv 6 (handicap m[8]) → toutes les saisons réindexées une fois */ } }   /* 20261031o : index plus ancien → refait */
 if (!RAT) console.log(`📦 scores ajoutés : ${nSc}`);
 // ═══ 20261031h — ↪️ CARRIÈRES (Antoine : « attention, lors d'un transfert… » puis « et les archives le savent ? »). Chaque match note déjà le club
 // du joueur CE jour-là, mais un joueur qui change de championnat (Lyon → Chelsea) avait 2 fiches sans lien. Fiche CENTRALE par sport :
@@ -318,6 +318,38 @@ if (!RAT) console.log(`📦 cotes gardées : ${nEv} match(s), ${nJ} joueur(s) av
 // 4 saisons, matchs finis → summary : score, feuille de match (mêmes champs que le direct) et cotes de CLÔTURE du pickcenter (1N2, handicap,
 // total : les seules qu'ESPN garde ; PAS de cotes joueurs, effacées après le match). Fiche marquée r: 1 (rattrapée). Déjà présente → sautée
 // (le passage peut être relancé sans tout refaire). Enregistrement tous les 150 matchs (un arrêt ne perd presque rien).
+// ═══ 20261103b — 🏀 HANDICAPS MANQUANTS (Antoine : « savoir si une équipe passe le cut » → B « a couvert le handicap du bookmaker »). Le summary
+// ESPN n'a AUCUN pickcenter pour la NBA 2023-24 / 2024-25 (archives : 0 handicap sur 1 232 / 1 234 matchs) ; SONDÉ le 03/11 : core
+// …/events/<id>/competitions/<id>/odds = 200, items[] { provider.name, spread (= ligne de l'équipe à DOMICILE : « CLE −12.5 » → −12.5 ;
+// « PHI −4.5 » PHI à l'extérieur → +4.5), overUnder }. HC_LIGUE=nba → chaque match fini sans hc.L : 1er fournisseur hors « Live » (ESPN BET,
+// DraftKings, Caesars… dans cet ordre de préférence) → fiche.hc = { L, h, a, src: 'core' } (h / a = cotes si données), puis index refait.
+const HCL = process.env.HC_LIGUE || '';
+if (HCL) {
+  const L = LIGUES.find((x) => x[1] === HCL); if (!L) { console.log('ligue inconnue ' + HCL); process.exit(0); }
+  const [sp, lg] = L, B = BASE(sp, lg), PREF = ['ESPN BET', 'DraftKings', 'Caesars Sportsbook', 'FanDuel', 'BetMGM'];
+  let sas = []; try { sas = fs.readdirSync(B).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {}
+  let n = 0, ok = 0;
+  for (const sa of sas) {
+    let F = []; try { F = fs.readdirSync(`${B}/${sa}/matchs`).filter((f) => /\.json$/.test(f)); } catch (e) { continue; }
+    for (const f of F) {
+      const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
+      const ids = Object.keys(D).filter((id) => D[id].f && !(D[id].hc && D[id].hc.L != null)); if (!ids.length) continue;
+      for (let i = 0; i < ids.length; i += 6) {
+        await Promise.all(ids.slice(i, i + 6).map(async (id) => {
+          n++; const j = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${id}/competitions/${id}/odds`);
+          const it = ((j && j.items) || []).filter((x) => x && x.spread != null && !/live/i.test((x.provider || {}).name || ''));
+          it.sort((a, b) => { const ia = PREF.findIndex((q) => ((a.provider || {}).name || '').indexOf(q) === 0), ib = PREF.findIndex((q) => ((b.provider || {}).name || '').indexOf(q) === 0); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+          const o = it[0]; if (!o) return; const s0 = parseFloat(o.spread); if (isNaN(s0)) return;
+          D[id].hc = { L: s0, h: dec((o.homeTeamOdds || {}).spreadOdds), a: dec((o.awayTeamOdds || {}).spreadOdds), src: 'core' }; ok++;
+        }));
+      }
+      fs.writeFileSync(p, JSON.stringify(D));
+    }
+    console.log(`🎯 ${lg} ${sa} : ${ok} handicaps trouvés sur ${n} demandés (cumul)`);
+  }
+  indexer(sp, lg);
+  process.exit(0);
+}
 if (RAT) {
   const L = LIGUES.find((x) => x[1] === RAT); if (!L) { console.log('ligue inconnue ' + RAT); process.exit(0); }
   const [sp, lg] = L, debut = new Date(Date.UTC(new Date(maintenant).getUTCFullYear() - (+process.env.RAT_ANS || 4), 6, 1)), mois = [];   /* 20261102i : RAT_ANS=5 → 1 saison de plus (foot, Antoine : « rajoute une saison supplémentaire mais seulement au foot » ; sondé : 2021-22 = résultats + feuilles, PAS de cotes) */

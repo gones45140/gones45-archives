@@ -1,0 +1,40 @@
+# GONES45 — 20261103b : handicaps manquants (core odds ESPN) pour une ligue, puis index refait. Lancé à la main.
+name: handicaps
+on:
+  workflow_dispatch:
+    inputs:
+      ligue:
+        description: 'Ligue (nba, nhl, nfl…)'
+        required: false
+        default: 'nba'
+permissions:
+  contents: write
+concurrency:
+  group: handicaps
+jobs:
+  hc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Handicaps ${{ inputs.ligue }}
+        env:
+          HC_LIGUE: ${{ inputs.ligue }}
+        run: node .github/scripts/cotes_archive.mjs
+      - name: Enregistrement
+        if: always()
+        run: |
+          git config user.name "Archive cotes"
+          git config user.email "actions@users.noreply.github.com"
+          git add cotes 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Handicaps ${{ inputs.ligue }} (core odds)"
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 7))
+          done
+          exit 1
