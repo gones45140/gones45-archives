@@ -361,31 +361,44 @@ if (PBL) {
   process.exit(0);
 }
 const HCL = process.env.HC_LIGUE || '';
+/* 20261103i (Antoine : « en foot on pourra faire quoi ? » → « oui ») : HC_LIGUE accepte une LISTE (« fra.1,eng.1 ») ou « foot » (championnats de clubs
+   + coupes d'Europe) ; complète aussi le 1N2 (ml { h, a, d }, cote de fermeture) — SONDÉ le 03/11 : core odds a 1N2 + handicap + total pour la
+   L1 2023-24 et la PL 2022-23 (summary : rien avant 2025-26). Chaque champ pris chez le 1er fournisseur hors « Live » qui l'a, dans l'ordre
+   ESPN BET, DraftKings, Caesars, FanDuel, BetMGM, Bet365 (Bet365 / Betfair donnent parfois une autre ligne de total : en dernier). */
+const FOOT_HC = ['fra.1', 'eng.1', 'esp.1', 'ita.1', 'ger.1', 'uefa.champions', 'uefa.europa', 'uefa.europa.conf', 'ned.1', 'por.1', 'fra.2', 'bra.1', 'arg.1'];
 if (HCL) {
-  const L = LIGUES.find((x) => x[1] === HCL); if (!L) { console.log('ligue inconnue ' + HCL); process.exit(0); }
-  const [sp, lg] = L, B = BASE(sp, lg), PREF = ['ESPN BET', 'DraftKings', 'Caesars Sportsbook', 'FanDuel', 'BetMGM'];
-  let sas = []; try { sas = fs.readdirSync(B).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {}
-  let n = 0, ok = 0;
-  for (const sa of sas) {
-    let F = []; try { F = fs.readdirSync(`${B}/${sa}/matchs`).filter((f) => /\.json$/.test(f)); } catch (e) { continue; }
-    for (const f of F) {
-      const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
-      const ids = Object.keys(D).filter((id) => D[id].f && (!(D[id].hc && D[id].hc.L != null) || !(D[id].tot && D[id].tot.L != null))); if (!ids.length) continue;   /* 20261103d : + total manquant */
-      for (let i = 0; i < ids.length; i += 6) {
-        await Promise.all(ids.slice(i, i + 6).map(async (id) => {
-          n++; const j = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${id}/competitions/${id}/odds`);
-          const it = ((j && j.items) || []).filter((x) => x && (x.spread != null || x.overUnder != null) && !/live/i.test((x.provider || {}).name || ''));
-          it.sort((a, b) => { const ia = PREF.findIndex((q) => ((a.provider || {}).name || '').indexOf(q) === 0), ib = PREF.findIndex((q) => ((b.provider || {}).name || '').indexOf(q) === 0); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
-          const o = it[0]; if (!o) return; const s0 = parseFloat(o.spread), u0 = parseFloat(o.overUnder);
-          if (!(D[id].hc && D[id].hc.L != null) && !isNaN(s0)) { D[id].hc = { L: s0, h: dec((o.homeTeamOdds || {}).spreadOdds), a: dec((o.awayTeamOdds || {}).spreadOdds), src: 'core' }; ok++; }
-          if (!(D[id].tot && D[id].tot.L != null) && !isNaN(u0)) D[id].tot = { L: u0, o: dec(o.overOdds), u: dec(o.underOdds), src: 'core' };   /* 20261103d */
-        }));
+  const LST = HCL === 'foot' ? FOOT_HC : HCL.split(',').map((x) => x.trim()).filter(Boolean);
+  const PREF = ['ESPN BET', 'DraftKings', 'Caesars Sportsbook', 'FanDuel', 'BetMGM', 'Bet365', 'Bet 365'];
+  const rang = (x) => { const nm = (x.provider || {}).name || '', k = PREF.findIndex((q) => nm.indexOf(q) === 0); return k < 0 ? 99 : k; };
+  for (const lgX of LST) {
+    const L = LIGUES.find((x) => x[1] === lgX); if (!L) { console.log('ligue inconnue ' + lgX); continue; }
+    const [sp, lg] = L, B = BASE(sp, lg);
+    let sas = []; try { sas = fs.readdirSync(B).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {}
+    let n = 0, ok = 0, okm = 0;
+    for (const sa of sas) {
+      let F = []; try { F = fs.readdirSync(`${B}/${sa}/matchs`).filter((f) => /\.json$/.test(f)); } catch (e) { continue; }
+      for (const f of F) {
+        const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
+        const manque = (x) => !(x.hc && x.hc.L != null) || !(x.tot && x.tot.L != null) || !(x.ml && (x.ml.h > 1 || x.ml.a > 1));
+        const ids = Object.keys(D).filter((id) => D[id].f && manque(D[id]) && !D[id].hcv); if (!ids.length) continue;   /* hcv : déjà demandé, rien chez ESPN */
+        for (let i = 0; i < ids.length; i += 6) {
+          await Promise.all(ids.slice(i, i + 6).map(async (id) => {
+            n++; const j = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${id}/competitions/${id}/odds`);
+            if (!j) return; const x0 = D[id];
+            const it = (j.items || []).filter((x) => x && !/live/i.test((x.provider || {}).name || '')).sort((a, b) => rang(a) - rang(b));
+            const oS = it.find((x) => !isNaN(parseFloat(x.spread))), oT = it.find((x) => !isNaN(parseFloat(x.overUnder))), oM = it.find((x) => dec((x.homeTeamOdds || {}).moneyLine) > 1 || dec((x.awayTeamOdds || {}).moneyLine) > 1);
+            if (!(x0.hc && x0.hc.L != null) && oS) { x0.hc = { L: parseFloat(oS.spread), h: dec((oS.homeTeamOdds || {}).spreadOdds), a: dec((oS.awayTeamOdds || {}).spreadOdds), src: 'core' }; ok++; }
+            if (!(x0.tot && x0.tot.L != null) && oT) x0.tot = { L: parseFloat(oT.overUnder), o: dec(oT.overOdds), u: dec(oT.underOdds), src: 'core' };   /* 20261103d */
+            if (!(x0.ml && (x0.ml.h > 1 || x0.ml.a > 1)) && oM) { x0.ml = { h: dec((oM.homeTeamOdds || {}).moneyLine), a: dec((oM.awayTeamOdds || {}).moneyLine), d: dec((oM.drawOdds || {}).moneyLine), src: 'core' }; okm++; }   /* 20261103i */
+            if (manque(x0)) x0.hcv = 1;
+          }));
+        }
+        fs.writeFileSync(p, JSON.stringify(D));
       }
-      fs.writeFileSync(p, JSON.stringify(D));
+      console.log(`🎯 ${lg} ${sa} : handicaps ${ok}, 1N2 ${okm} trouvés sur ${n} demandés (cumul)`);
     }
-    console.log(`🎯 ${lg} ${sa} : ${ok} handicaps trouvés sur ${n} demandés (cumul)`);
+    indexer(sp, lg);
   }
-  indexer(sp, lg);
   process.exit(0);
 }
 if (RAT) {
