@@ -49,12 +49,12 @@ function indexer(sp, lg) {   /* une passe par saison présente */
 }
 function indexerSaison(sp, lg, sa) {
   const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
-  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 6 };   /* 20261103b : iv 6 = handicap m[8] dans les équipes */   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
+  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 7 };   /* 20261103d : iv 7 = total m[9] */   /* 20261103b : iv 6 = handicap m[8] dans les équipes */   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
       if (x.f) { ETAT.n++; if (x.v2) ETAT.v2++; }
-      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null]);   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
+      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null, (x.tot && x.tot.L != null && !isNaN(+x.tot.L)) ? +x.tot.L : null]);   /* 20261103d : m[9] = total du match (ligne du book) */   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
       /* 30/10 : m[7] = étiquette du match où le joueur N'A PAS joué — 'B' banc, 'A:<statut> <motif>' absent annoncé, 'D:<raison>' n'a pas
          joué (US) ; m[4] reste null (l'appli ne compte comme joués que les matchs avec stats → les séries ne changent pas). */
       const tag = {}, nomT = {}, cotT = {};
@@ -273,7 +273,7 @@ for (const [sp, lg] of LIGUES) {
 }   /* fin !RAT */
 if (!RAT) for (const x of touchees) { const [sp, lg] = x.split('|'); indexer(sp, lg); }
 // 20261031k : saison sans etat.json (indexée avant ce fichier, ex. par un rattrapage plus ancien) → réindexée une fois
-if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) { let et = null; try { et = JSON.parse(fs.readFileSync(`${BASE(sp, lg)}/${sa}/etat.json`, 'utf8')); } catch (e) {} if (!et || !(et.iv >= 6)) indexerSaison(sp, lg, sa);   /* 20261103b : iv 6 (handicap m[8]) → toutes les saisons réindexées une fois */ } }   /* 20261031o : index plus ancien → refait */
+if (!RAT) for (const [sp, lg] of LIGUES) { if (touchees.has(sp + '|' + lg)) continue; let SA = []; try { SA = fs.readdirSync(BASE(sp, lg)).filter((d) => /^\d{4}(-\d{2})?$/.test(d)); } catch (e) {} for (const sa of SA) { let et = null; try { et = JSON.parse(fs.readFileSync(`${BASE(sp, lg)}/${sa}/etat.json`, 'utf8')); } catch (e) {} if (!et || !(et.iv >= 7)) indexerSaison(sp, lg, sa);   /* 20261103b : iv 6 (handicap m[8]) → toutes les saisons réindexées une fois */ } }   /* 20261031o : index plus ancien → refait */
 if (!RAT) console.log(`📦 scores ajoutés : ${nSc}`);
 // ═══ 20261031h — ↪️ CARRIÈRES (Antoine : « attention, lors d'un transfert… » puis « et les archives le savent ? »). Chaque match note déjà le club
 // du joueur CE jour-là, mais un joueur qui change de championnat (Lyon → Chelsea) avait 2 fiches sans lien. Fiche CENTRALE par sport :
@@ -333,14 +333,15 @@ if (HCL) {
     let F = []; try { F = fs.readdirSync(`${B}/${sa}/matchs`).filter((f) => /\.json$/.test(f)); } catch (e) { continue; }
     for (const f of F) {
       const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
-      const ids = Object.keys(D).filter((id) => D[id].f && !(D[id].hc && D[id].hc.L != null)); if (!ids.length) continue;
+      const ids = Object.keys(D).filter((id) => D[id].f && (!(D[id].hc && D[id].hc.L != null) || !(D[id].tot && D[id].tot.L != null))); if (!ids.length) continue;   /* 20261103d : + total manquant */
       for (let i = 0; i < ids.length; i += 6) {
         await Promise.all(ids.slice(i, i + 6).map(async (id) => {
           n++; const j = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${id}/competitions/${id}/odds`);
-          const it = ((j && j.items) || []).filter((x) => x && x.spread != null && !/live/i.test((x.provider || {}).name || ''));
+          const it = ((j && j.items) || []).filter((x) => x && (x.spread != null || x.overUnder != null) && !/live/i.test((x.provider || {}).name || ''));
           it.sort((a, b) => { const ia = PREF.findIndex((q) => ((a.provider || {}).name || '').indexOf(q) === 0), ib = PREF.findIndex((q) => ((b.provider || {}).name || '').indexOf(q) === 0); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
-          const o = it[0]; if (!o) return; const s0 = parseFloat(o.spread); if (isNaN(s0)) return;
-          D[id].hc = { L: s0, h: dec((o.homeTeamOdds || {}).spreadOdds), a: dec((o.awayTeamOdds || {}).spreadOdds), src: 'core' }; ok++;
+          const o = it[0]; if (!o) return; const s0 = parseFloat(o.spread), u0 = parseFloat(o.overUnder);
+          if (!(D[id].hc && D[id].hc.L != null) && !isNaN(s0)) { D[id].hc = { L: s0, h: dec((o.homeTeamOdds || {}).spreadOdds), a: dec((o.awayTeamOdds || {}).spreadOdds), src: 'core' }; ok++; }
+          if (!(D[id].tot && D[id].tot.L != null) && !isNaN(u0)) D[id].tot = { L: u0, o: dec(o.overOdds), u: dec(o.underOdds), src: 'core' };   /* 20261103d */
         }));
       }
       fs.writeFileSync(p, JSON.stringify(D));
