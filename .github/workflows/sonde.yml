@@ -6,36 +6,15 @@ jobs:
     steps:
       - run: |
           cat > s.mjs <<'JS'
-          const J=async u=>{try{const r=await fetch(u,{headers:{'User-Agent':'Mozilla/5.0'}});const t=await r.text();let j=null;try{j=JSON.parse(t)}catch(e){};return [r.status,j,t]}catch(e){return [0,null,'']}};
-          // 1. ligues rugby ESPN
-          let [s,l]=await J('https://sports.core.api.espn.com/v2/sports/rugby/leagues?limit=200');
-          const refs=(l&&l.items||[]).map(x=>x.$ref);
-          const noms=[];for(const r of refs){const [,x]=await J(r);if(x)noms.push(x.id+':'+x.name);}
-          console.log('LIGUES RUGBY',noms.join(' | ').slice(0,3000));
-          // 2. sondage de quelques ligues (Top14 270559 pour comparaison)
-          for(const lg of ['270559','271937','272073','272104','180659','244293','270557','267979']){
-            const [s1,sb]=await J('https://site.api.espn.com/apis/site/v2/sports/rugby/'+lg+'/scoreboard?dates=202401');
-            const ev=(sb&&sb.events||[]).filter(e=>e.status&&e.status.type&&e.status.type.completed);
-            let x='';if(ev[0]){const [,sm]=await J('https://site.api.espn.com/apis/site/v2/sports/rugby/'+lg+'/summary?event='+ev[0].id);
-              const bs=sm&&sm.boxscore; x=' summary:'+Object.keys(sm||{}).join(',')+' | rosters '+((sm&&sm.rosters)||[]).map(r=>(r.roster||[]).length).join('/')+' | stats1 '+JSON.stringify(((((sm||{}).rosters||[])[0]||{}).roster||[])[0]?.stats||null).slice(0,200)+' | keyEvents '+((sm&&sm.keyEvents)||[]).length+' | teamstats '+JSON.stringify(((bs&&bs.teams)||[]).map(t=>(t.statistics||[]).map(z=>z.name)).slice(0,1)).slice(0,300);
-              const [so,od]=await J('https://sports.core.api.espn.com/v2/sports/rugby/leagues/'+lg+'/events/'+ev[0].id+'/competitions/'+ev[0].id+'/odds'); x+=' | odds '+so+' n='+(od&&od.count);}
-            console.log('LG',lg,s1,'nom',sb&&sb.leagues&&sb.leagues[0]&&sb.leagues[0].name,'finis 2024-01:',ev.length,ev[0]?ev[0].name:'',x);
+          const J=async u=>{try{const r=await fetch(u);return r.ok?await r.json():null}catch(e){return null}};
+          for(const [sp,lg,d] of [['rugby','270559','202401'],['rugby','180659','202402'],['rugby-league','3','202409']]){
+            const sb=await J('https://site.api.espn.com/apis/site/v2/sports/'+sp+'/'+lg+'/scoreboard?dates='+d);
+            const e=(sb&&sb.events||[]).find(x=>x.status&&x.status.type&&x.status.type.completed); if(!e){console.log(lg,'aucun match');continue;}
+            const sm=await J('https://site.api.espn.com/apis/site/v2/sports/'+sp+'/'+lg+'/summary?event='+e.id);
+            const p=(((sm&&sm.rosters)||[])[0]||{}).roster||[];
+            console.log(lg,e.name,'stats noms :',(p[0]&&p[0].stats||[]).map(s=>s.name).join(','));
+            const top=p.map(x=>[x.athlete&&x.athlete.displayName,((x.stats||[]).find(s=>/^tries$/i.test(s.name))||{}).value]).filter(x=>x[1]>0);
+            console.log(lg,'marqueurs d essais',JSON.stringify(top).slice(0,300));
           }
-          // 3. NRL
-          for(const d of ['202409','202509']){
-            const [s1,sb]=await J('https://site.api.espn.com/apis/site/v2/sports/rugby-league/3/scoreboard?dates='+d);
-            const ev=(sb&&sb.events||[]).filter(e=>e.status&&e.status.type&&e.status.type.completed);
-            let x='';if(ev[0]){const [,sm]=await J('https://site.api.espn.com/apis/site/v2/sports/rugby-league/3/summary?event='+ev[0].id);
-              x=' summary:'+Object.keys(sm||{}).join(',')+' | rosters '+((sm&&sm.rosters)||[]).map(r=>(r.roster||[]).length).join('/')+' | stats1 '+JSON.stringify(((((sm||{}).rosters||[])[0]||{}).roster||[])[0]?.stats||null).slice(0,250)+' | keyEvents '+((sm&&sm.keyEvents)||[]).length+' | plays '+((sm&&sm.plays)||[]).length;
-              const [so,od]=await J('https://sports.core.api.espn.com/v2/sports/rugby-league/leagues/3/events/'+ev[0].id+'/competitions/'+ev[0].id+'/odds'); x+=' | odds '+so+' n='+(od&&od.count)+' '+JSON.stringify((od&&od.items||[]).slice(0,2).map(i=>({p:i.provider&&i.provider.name,s:i.spread,ou:i.overUnder}))).slice(0,200);}
-            console.log('NRL',d,s1,'finis',ev.length,ev[0]?ev[0].name:'',x);
-          }
-          // 4. xG foot
-          { const [,sb]=await J('https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard?dates=20261101');
-            const e=(sb&&sb.events||[])[0]; if(e){const [,sm]=await J('https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/summary?event='+e.id);
-            const st=((sm&&sm.boxscore&&sm.boxscore.teams)||[])[0]; console.log('XG stats équipe',JSON.stringify((st&&st.statistics||[]).map(z=>z.name)).slice(0,900));
-            console.log('XG mots', /expected|xg/i.test(JSON.stringify(sm||{})) ? (JSON.stringify(sm).match(/.{60}(expected|xG|xg).{60}/i)||[''])[0] : 'aucun');}}
-          // 5. LNR
-          for(const u of ['https://www.lnr.fr/robots.txt','https://top14.lnr.fr/robots.txt']){const [s1,,t]=await J(u);console.log('LNR',u,s1,t.slice(0,600).replace(/\n/g,' ¶ '));}
           JS
           node s.mjs
