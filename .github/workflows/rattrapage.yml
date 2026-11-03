@@ -12,6 +12,10 @@ on:
         description: 'Nombre de saisons en arrière (4 ; 5 pour le foot depuis 20261102i)'
         required: false
         default: '4'
+      xg:
+        description: 'Relire aussi les matchs de foot pour le xG (1 = oui)'
+        required: false
+        default: ''
 permissions:
   contents: write
 jobs:
@@ -47,6 +51,7 @@ jobs:
         env:
           RATTRAPAGE: ${{ matrix.ligue }}
           RAT_ANS: ${{ inputs.ans }}
+          RAT_XG: ${{ inputs.xg }}
         run: node .github/scripts/cotes_archive.mjs
       - name: Enregistrement
         if: always()
