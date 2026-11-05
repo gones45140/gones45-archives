@@ -59,22 +59,27 @@ function matchsEquipe(sp, lg, id) {
       if (!m || !m[4] || m[4][0] == null || m[4][1] == null) continue;
       if (US.has(sp) && m[5] !== 2) continue;   // saison régulière seulement (comme les critères « championnat »)
       const d = m[3] === 'h';
-      L.push({ t: m[0], sa: s, d, p: d ? +m[4][0] : +m[4][1], c: d ? +m[4][1] : +m[4][0], ot: m[6] ? 1 : 0 });
+      L.push({ t: m[0], sa: s, d, p: d ? +m[4][0] : +m[4][1], c: d ? +m[4][1] : +m[4][0], ot: m[6] ? 1 : 0, q: m[13] ? 1 : 0 });   /* 20261106l : q = qualification */
     }
   }
   L.sort((a, b) => a.t - b.t);
   return { nom, L, sa };
 }
 
-function serie(ms, f) {
-  let pire = 0, cur = 0, ok = 0; const parS = {};
+/* 20261106l (Plzeň : « la stat ne prenait peut-être pas en compte les qualifs, donc reste vrai » → « A + ») : séries sur la PHASE PRINCIPALE
+   seulement (qualifications sautées) ; qv = date de la dernière réussite EN QUALIFICATION pendant la série en cours (mention ⚠️ sur la carte). */
+function serie(ms0, f) {
+  const ms = ms0.filter((m) => !m.q);
+  let pire = 0, cur = 0, ok = 0, qv = 0; const parS = {};
+  const dern = ms.length ? ms[ms.length - 1].t : 0; let debut = 0;
   for (const m of ms) {
     const r = f(m.p, m.c, m.ot);
     if (r) { ok++; cur = 0; } else { cur++; if (cur > pire) pire = cur; }
     const P = parS[m.sa] || (parS[m.sa] = { cur: 0, pire: 0 });
     if (r) P.cur = 0; else { P.cur++; if (P.cur > P.pire) P.pire = P.cur; }
   }
-  return { n: ms.length, ok, pire, cours: cur, parS };
+  if (cur) { debut = ms[ms.length - cur].t; for (const m of ms0) if (m.q && m.t > debut && f(m.p, m.c, m.ot)) qv = m.t; }
+  return { n: ms.length, ok, pire, cours: cur, parS, qv };
 }
 
 const now = Date.now(), fin = now + H24, out = [];
@@ -106,7 +111,7 @@ for (const [sp, lg] of LIGUES) {
             out.push({ sp, lg, ligue, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
               d: dom ? 1 : 0, lieu, k, lib,
               /* 20261105v (« on habille la carte ») : logo + couleur de l'équipe, logo de l'adversaire (fournis par le calendrier ESPN) */
-              llogo, logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
+              llogo, logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
           }
         }
       }

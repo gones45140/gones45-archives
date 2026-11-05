@@ -8,7 +8,7 @@ on:
         required: false
         default: 'nba'
       mode:
-        description: 'handicaps (anciennes saisons), refaire (relit les lignes core) ou propbets (saison en cours : total équipe + lignes joueurs) ou tiers (scores par période, nhl)'
+        description: 'handicaps (anciennes saisons), refaire (relit les lignes core) ou propbets (saison en cours : total équipe + lignes joueurs) ou tiers (scores par période, nhl) ou index (index refait seulement)'
         required: false
         default: 'handicaps'
 permissions:
@@ -26,8 +26,9 @@ jobs:
           node-version: '22'
       - name: Handicaps ${{ inputs.ligue }}
         env:
-          HC_LIGUE: ${{ (inputs.mode == 'propbets' || inputs.mode == 'tiers') && '' || inputs.ligue }}
+          HC_LIGUE: ${{ (inputs.mode == 'propbets' || inputs.mode == 'tiers' || inputs.mode == 'index') && '' || inputs.ligue }}
           PE_LIGUE: ${{ inputs.mode == 'tiers' && inputs.ligue || '' }}
+          IDX_LIGUE: ${{ inputs.mode == 'index' && inputs.ligue || '' }}
           PB_LIGUE: ${{ inputs.mode == 'propbets' && inputs.ligue || '' }}
           HC_REFAIRE: ${{ inputs.mode == 'refaire' && '1' || '' }}
         run: node .github/scripts/cotes_archive.mjs

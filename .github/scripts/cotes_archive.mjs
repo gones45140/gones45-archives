@@ -64,7 +64,7 @@ function indexerSaison(sp, lg, sa) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
       if (x.f) { ETAT.n++; if (x.v2) ETAT.v2++; }
-      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null, (x.tot && x.tot.L != null && !isNaN(+x.tot.L)) ? +x.tot.L : null, (x.teq && x.teq[k] && x.teq[k].length && x.teq[k][0][0] != null) ? +x.teq[k][0][0] : null, (x.ml && (x.ml.h > 1 || x.ml.a > 1)) ? [k === 'h' ? x.ml.h || 0 : x.ml.a || 0, x.ml.d || 0, k === 'h' ? x.ml.a || 0 : x.ml.h || 0] : null, x.pe || null]);   /* 20261106k : m[12] = scores par période [[dom, ext], …] (même ordre que m[4]) */   /* 20261103i : m[11] = cotes de fermeture [victoire, nul, défaite] de l'ÉQUIPE */   /* 20261103f : m[10] = total de l'équipe (ligne du book) */   /* 20261103d : m[9] = total du match (ligne du book) */   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
+      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null, (x.tot && x.tot.L != null && !isNaN(+x.tot.L)) ? +x.tot.L : null, (x.teq && x.teq[k] && x.teq[k].length && x.teq[k][0][0] != null) ? +x.teq[k][0][0] : null, (x.ml && (x.ml.h > 1 || x.ml.a > 1)) ? [k === 'h' ? x.ml.h || 0 : x.ml.a || 0, x.ml.d || 0, k === 'h' ? x.ml.a || 0 : x.ml.h || 0] : null, x.pe || null, x.q ? 1 : 0]);   /* 20261106l : m[13] = 1 si match de qualification (coupes d'Europe) */   /* 20261106k : m[12] = scores par période [[dom, ext], …] (même ordre que m[4]) */   /* 20261103i : m[11] = cotes de fermeture [victoire, nul, défaite] de l'ÉQUIPE */   /* 20261103f : m[10] = total de l'équipe (ligne du book) */   /* 20261103d : m[9] = total du match (ligne du book) */   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
       /* 30/10 : m[7] = étiquette du match où le joueur N'A PAS joué — 'B' banc, 'A:<statut> <motif>' absent annoncé, 'D:<raison>' n'a pas
          joué (US) ; m[4] reste null (l'appli ne compte comme joués que les matchs avec stats → les séries ne changent pas). */
       const tag = {}, nomT = {}, cotT = {};
@@ -106,7 +106,7 @@ const cotePb = (x) => { let d = dec((x.odds || {}).decimal); const ov = (x.curre
 const maintenant = Date.now(), fichiers = {};
 let nEv = 0, nJ = 0;
 // 20261031a : RATTRAPAGE=<ligue> (bouton du robot, 4 saisons passées) → seulement la partie rattrapage, en fin de fichier
-const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE || process.env.KHL_ARCH ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
+const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE || process.env.KHL_ARCH || process.env.IDX_LIGUE ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
 for (const [sp, lg] of (RAT ? [] : LIGUES)) {
   const jours = [0, 1].map((k) => new Date(maintenant + k * 864e5).toISOString().slice(0, 10).replace(/-/g, ''));
   const vus = new Set();
@@ -432,6 +432,8 @@ if (process.env.KHL_ARCH) {
 }
 /* 20261106k — 🏒 PE_LIGUE=nhl : scores par TIERS des saisons déjà archivées, sans relire chaque feuille : scoreboard PAR MOIS (dates=AAAAMM,
    limit=1000, comme le rattrapage) → linescores de chaque match fini → fiche.pe là où il manque, puis index refait (m[12]). */
+/* 20261106l — IDX_LIGUE=uefa.europa,… : index refait seulement (nouvelle colonne m[13]) */
+if (process.env.IDX_LIGUE) { for (const lgX of process.env.IDX_LIGUE.split(',')) { const L = LIGUES.find((x) => x[1] === lgX.trim()); if (L) indexer(L[0], L[1]); } process.exit(0); }
 const PEL = process.env.PE_LIGUE || '';
 if (PEL) {
   const L = LIGUES.find((x) => x[1] === PEL); if (!L) { console.log('ligue inconnue ' + PEL); process.exit(0); }
