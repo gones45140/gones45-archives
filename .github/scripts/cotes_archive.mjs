@@ -391,6 +391,8 @@ if (process.env.KHL_ARCH) {
   (function desc(o, d) { if (!o || typeof o !== 'object' || d > 12) return; if (Array.isArray(o)) { o.forEach((x) => desc(x, d + 1)); return; }
     const nm = o.name || o.title; if (o.id && typeof nm === 'string') { const m = nm.match(/(\d{4})\s*\/\s*(\d{4})/); if (m) { const po = /play\s*-?\s*off|cup/i.test(nm), rg = /regular/i.test(nm); if (po || rg) { (ST[m[2]] = ST[m[2]] || {})[po ? 'po' : 'reg'] = +o.id; } } }
     for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') desc(o[k], d + 1); })(data, 0);
+  /* 20261106l : SONDÉ (console d'Antoine) — data.stages_v2 = [{ id 407, type « regular » | « playoff », season « 2026/2027 » }, …] (39 stages, 2008 → 2027) */
+  for (const x of (data && data.stages_v2) || []) { const m = String(x.season || '').match(/(\d{4})\s*\/\s*(\d{4})/); if (!m || !x.id) continue; const po = /playoff/i.test(x.type || x.title || ''), rg = /regular/i.test(x.type || x.title || ''); if (po || rg) (ST[m[2]] = ST[m[2]] || {})[po ? 'po' : 'reg'] = +x.id; }
   const cur = data && +data.current_stage_id;
   const ans = Object.keys(ST).sort().slice(-(+process.env.KHL_ANS || 1));
   const stages = []; for (const an of ans) for (const k of ['reg', 'po']) if (ST[an][k]) stages.push([ST[an][k], k === 'po' ? 3 : 2]);
