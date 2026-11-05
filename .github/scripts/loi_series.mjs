@@ -118,6 +118,54 @@ for (const [sp, lg] of LIGUES) {
     }
   }
 }
+/* ═══ 20261106u — 🏒 KHL DANS LES PÉPITES (Antoine : « KHL dans les pépites du jour de la Loi des séries ; go »). Matchs des 24 h = khl.ru
+   events_v2 par dates (q[start_at_gt/lt_time_from_unixtime], comme l'appli) via le worker ; team_a = domicile ; archives cotes/hockey/khl
+   (robot khl.yml). Mêmes paris et mêmes règles que la NHL. ═══ */
+{
+  const W = 'https://fd-proxy.touraine-antoine.workers.dev/?host=khl&path=';
+  const khl = async (fic, q) => {
+    const u = W + encodeURIComponent('/' + fic + '.json?locale=en' + (q ? '&' + q : ''));
+    for (let i = 0; i < 4; i++) {
+      try { const c = new AbortController(), tm = setTimeout(() => c.abort(), 40000); const r = await fetch(u, { signal: c.signal }); clearTimeout(tm);
+        if (r.ok) { const t = await r.text(); if (/^\s*[\[{]/.test(t)) return JSON.parse(t); } } catch (e) {}
+      await new Promise((r) => setTimeout(r, 4000 * (i + 1)));
+    }
+    return null;
+  };
+  const data = await khl('data', ''), stage = data && +data.current_stage_id;
+  let nK = 0, pK = 0;
+  if (stage) {
+    const vus = new Set();
+    for (let page = 1; page <= 4; page++) {
+      const j = await khl('events_v2', `stage_id=${stage}&order_direction=asc&page=${page}&q%5Bstart_at_gt_time_from_unixtime%5D=${Math.floor(now / 1000)}&q%5Bstart_at_lt_time_from_unixtime%5D=${Math.floor(fin / 1000)}`);
+      if (!Array.isArray(j) || !j.length) break;
+      let neufs = 0;
+      for (const it of j) {
+        const e = (it && it.event) || it; if (!e || !e.id || vus.has(e.id)) continue; vus.add(e.id); neufs++;
+        const t = +e.start_at < 1e12 ? +e.start_at * 1000 : +e.start_at; if (!(t > now && t <= fin) || (e.game_state_key && e.game_state_key !== 'not_yet_started') || !e.team_a || !e.team_b) continue;
+        nMatchs++; nK++;
+        for (const [co, adv, dom] of [[e.team_a, e.team_b, true], [e.team_b, e.team_a, false]]) {
+          const E = matchsEquipe('hockey', 'khl', String(co.id)); if (!E || !E.L.length) continue;
+          for (const [k, lib, f] of PARIS.hockey) {
+            const vu = {};
+            for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
+              const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
+              const R = serie(ms, f);
+              if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < 1 || R.pire - R.cours > 1) continue;
+              const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
+              out.push({ sp: 'hockey', lg: 'khl', ligue: 'KHL', eid: 'khl' + e.id, t, id: String(co.id), eq: E.nom || co.name || '', adv: adv.name || '', d: dom ? 1 : 0, lieu, k, lib,
+                llogo: '', logo: co.image || '', c: '', alogo: adv.image || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined,
+                p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
+              pK++;
+            }
+          }
+        }
+      }
+      if (!neufs || j.length < 16) break;
+    }
+  }
+  console.log(`KHL : ${nK} matchs dans les 24 h, ${pK} pépites (stage ${stage || '?'})`);
+}
 out.sort((a, b) => (a.pire - a.cours) - (b.pire - b.cours) || a.t - b.t);
 fs.mkdirSync('loi', { recursive: true });
 fs.writeFileSync('loi/loi_series.json', JSON.stringify({ at: now, n: nMatchs, s: NSAI, L: out }));
