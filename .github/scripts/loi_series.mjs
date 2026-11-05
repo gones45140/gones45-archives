@@ -117,3 +117,29 @@ out.sort((a, b) => (a.pire - a.cours) - (b.pire - b.cours) || a.t - b.t);
 fs.mkdirSync('loi', { recursive: true });
 fs.writeFileSync('loi/loi_series.json', JSON.stringify({ at: now, n: nMatchs, s: NSAI, L: out }));
 console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} pépites`);
+
+/* 20261106i — 🔎 CRITÈRES DANS LE COCKPIT (Antoine : « si je veux Edmonton pour regarder ce que ça donne je suis obligé d'aller dans
+   Compétitions / sport / équipe… parce que pas dans mon mur ») : index de TOUTES les équipes des championnats archivés, pour la recherche
+   de l'appli. Nom complet ESPN (miroir standings.json, ex. « Paris Saint-Germain » : le foot retrouve l'équipe PAR LE NOM) ; sinon le nom
+   court des archives (equipes.json de la dernière saison). Sortie : loi/equipes.json { at, L: [[sp, lg, ligue, id, nom, logo], …] }. */
+{
+  const IX = [], vusE = new Set();
+  for (const [sp, lg] of LIGUES) {
+    if (/^uefa\./.test(lg)) continue;   // coupes d'Europe : les clubs sont déjà dans leur championnat
+    const st = lireJ(`miroir/${sp}/${lg}/standings.json`), noms = {};
+    let ligN = (st && (st.abbreviation || st.name)) || { '270559': 'Top 14', '271937': 'Premiership', '272073': 'URC', '3': 'NRL' }[lg] || '';
+    if (st) JSON.stringify(st, (k, v) => { if (v && v.team && v.team.id && v.team.displayName && !noms[v.team.id]) { const Lg = v.team.logos || []; noms[v.team.id] = [v.team.displayName, (Lg.find((x) => (x.rel || []).includes('dark')) || Lg[0] || {}).href || '']; } return v; });
+    const base = `cotes/${SPN[sp]}/${lg}`;
+    let sa = []; try { sa = fs.readdirSync(base).filter((x) => /^\d{4}(-\d{2})?$/.test(x)).sort(); } catch (e) {}
+    const eqj = sa.length ? lireJ(`${base}/${sa[sa.length - 1]}/equipes.json`) : null;
+    const ids = new Set([...Object.keys(eqj || {}), ...Object.keys(noms)]);
+    for (const id of ids) {
+      const cle = sp + '|' + lg + '|' + id; if (vusE.has(cle)) continue; vusE.add(cle);
+      const nom = (noms[id] && noms[id][0]) || (eqj && eqj[id] && eqj[id][0]) || ''; if (!nom) continue;
+      IX.push([sp, lg, ligN || lg, String(id), nom, (noms[id] && noms[id][1]) || (sp === 'rugby' ? `https://a.espncdn.com/i/teamlogos/rugby/teams/500/${id}.png` : '')]);
+    }
+  }
+  IX.sort((a, b) => a[4].localeCompare(b[4], 'fr'));
+  fs.writeFileSync('loi/equipes.json', JSON.stringify({ at: now, L: IX }));
+  console.log(`Index équipes : ${IX.length}`);
+}
