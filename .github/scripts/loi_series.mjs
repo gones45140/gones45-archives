@@ -129,10 +129,10 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
    court des archives (equipes.json de la dernière saison). Sortie : loi/equipes.json { at, L: [[sp, lg, ligue, id, nom, logo], …] }. */
 {
   const IX = [], vusE = new Set();
-  for (const [sp, lg] of LIGUES) {
+  for (const [sp, lg] of [...LIGUES, ['hockey', 'khl']]) {   /* 20261106m : + KHL (archive khl.yml) */
     if (/^uefa\./.test(lg)) continue;   // coupes d'Europe : les clubs sont déjà dans leur championnat
     const st = lireJ(`miroir/${sp}/${lg}/standings.json`), noms = {};
-    let ligN = (st && (st.abbreviation || st.name)) || { '270559': 'Top 14', '271937': 'Premiership', '272073': 'URC', '3': 'NRL' }[lg] || '';
+    let ligN = (st && (st.abbreviation || st.name)) || { '270559': 'Top 14', '271937': 'Premiership', '272073': 'URC', '3': 'NRL', khl: 'KHL' }[lg] || '';
     if (st) JSON.stringify(st, (k, v) => { if (v && v.team && v.team.id && v.team.displayName && !noms[v.team.id]) { const Lg = v.team.logos || []; noms[v.team.id] = [v.team.displayName, (Lg.find((x) => (x.rel || []).includes('dark')) || Lg[0] || {}).href || '']; } return v; });
     const base = `cotes/${SPN[sp]}/${lg}`;
     let sa = []; try { sa = fs.readdirSync(base).filter((x) => /^\d{4}(-\d{2})?$/.test(x)).sort(); } catch (e) {}
