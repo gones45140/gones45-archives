@@ -1,0 +1,36 @@
+# GONES45 — 📊 Loi des séries (20261105r, Antoine : « que ça se mette à jour chaque matin »). Équipes qui jouent dans les 24 h et qui sont à
+# 1 raté (ou moins) de leur pire série sur 5 saisons → loi/loi_series.json, lu par l'appli (Cockpit → 📊 Loi des séries). Voir .github/scripts/loi_series.mjs.
+name: loi-series
+on:
+  schedule:
+    - cron: '41 5 * * *'   # ≈ 6 h 41 à Paris l'hiver (minute décalée : GitHub est saturé à la minute 0)
+  workflow_dispatch:
+concurrency:
+  group: loi-series
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  loi:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Loi des séries
+        run: node .github/scripts/loi_series.mjs
+      - name: Enregistrement
+        run: |
+          git config user.name "Loi des séries"
+          git config user.email "actions@users.noreply.github.com"
+          git add loi
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Loi des séries $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          exit 1
