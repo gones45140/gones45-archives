@@ -101,7 +101,9 @@ for (const [sp, lg] of LIGUES) {
             if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < 1 || R.pire - R.cours > 1) continue;
             const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;   // même chiffre en 🏠 et partout : une seule ligne
             out.push({ sp, lg, ligue, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
-              d: dom ? 1 : 0, lieu, k, lib, pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
+              d: dom ? 1 : 0, lieu, k, lib,
+              /* 20261105v (« on habille la carte ») : logo + couleur de l'équipe, logo de l'adversaire (fournis par le calendrier ESPN) */
+              logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
           }
         }
       }
