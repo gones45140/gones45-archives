@@ -84,6 +84,9 @@ for (const [sp, lg] of LIGUES) {
   for (const j of [...new Set([jour(now), jour(fin)])]) {
     const sb = await scoreboard(sp, lg, j); if (!sb) continue;
     const ligue = (sb.leagues && sb.leagues[0] && (sb.leagues[0].abbreviation || sb.leagues[0].name)) || lg;
+    /* 20261105x (« dans mes entourés, y mettre le logo du championnat ») : logo ESPN de la ligue, version pour fond sombre si elle existe */
+    const LG = ((sb.leagues && sb.leagues[0] && sb.leagues[0].logos) || []), lgD = LG.find((x) => (x.rel || []).includes('dark')) || LG[0];
+    const llogo = (lgD && lgD.href) || '';
     for (const ev of sb.events || []) {
       const t = Date.parse(ev.date); if (!(t > now && t <= fin) || vus.has(ev.id)) continue;
       const st = ev.status && ev.status.type && ev.status.type.state; if (st && st !== 'pre') continue;
@@ -103,7 +106,7 @@ for (const [sp, lg] of LIGUES) {
             out.push({ sp, lg, ligue, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
               d: dom ? 1 : 0, lieu, k, lib,
               /* 20261105v (« on habille la carte ») : logo + couleur de l'équipe, logo de l'adversaire (fournis par le calendrier ESPN) */
-              logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
+              llogo, logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
           }
         }
       }
