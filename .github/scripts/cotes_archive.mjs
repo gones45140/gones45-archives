@@ -538,8 +538,12 @@ if (RAT) {
   const fic = {}, lireF = (mo) => { if (!fic[mo]) { try { fic[mo] = JSON.parse(fs.readFileSync(FMOIS(sp, lg, mo), 'utf8')); } catch (e) { fic[mo] = {}; } } return fic[mo]; };
   const ecrire = () => { for (const [mo, F] of Object.entries(fic)) if (Object.keys(F).length) { const p = FMOIS(sp, lg, mo); fs.mkdirSync(p.replace(/\/[^/]+$/, ''), { recursive: true }); fs.writeFileSync(p, JSON.stringify(F)); } };
   let n = 0, nouv = 0;
-  for (const mo of mois) {
-    const sb = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/scoreboard?dates=${mo.replace('-', '')}&limit=1000`);
+  /* 20261106l (capture Plzeň « je comprends pas c'est sur quel match ? » → Sofascore : victoire 5-1 le 27/08 absente → « 5 ratés de suite » FAUX) :
+     les QUALIFICATIONS des coupes d'Europe sont chez ESPN dans une autre ligue (SONDÉ le 06/11, console d'Antoine, 27/08/2026 : uefa.europa_qual
+     12 matchs, uefa.europa.conf_qual 23, uefa.champions_qual 0 ce jour-là) → lues aussi et rangées DANS la compétition principale (fiche.q = 1). */
+  const QUAL = { 'uefa.europa': ['uefa.europa_qual'], 'uefa.champions': ['uefa.champions_qual'], 'uefa.europa.conf': ['uefa.europa.conf_qual'] };
+  for (const mo of mois) for (const src of [lg, ...(QUAL[lg] || [])]) {
+    const sb = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${src}/scoreboard?dates=${mo.replace('-', '')}&limit=1000`);
     for (const e of (sb && sb.events) || []) {
       const st = ((e.status || {}).type || {}); if (!st.completed) continue;
       const t = Date.parse(e.date), moE = new Date(t).toISOString().slice(0, 7), F = lireF(moE);
@@ -550,10 +554,11 @@ if (RAT) {
       const V3 = sp === 'rugby' || sp === 'rugby-league' || (sp === 'soccer' && !!process.env.RAT_XG);
       const sansE = (sp === 'rugby' || sp === 'rugby-league') && vx && !vx.ac && !Object.values(vx.st || {}).some((o) => o.s && o.s.E);   /* 20261103l : rugby sans essai → relu (actions) */
       if (vx && vx.f && vx.v2 && (vx.v3 || !V3) && !sansE) continue;   /* 20261031n : v2 = feuille complète (foot cf + REM, US présence J, MLB batting / pitching) ; sinon relue une fois */
-      const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${e.id}`); if (!sm) continue;
+      const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${src}/summary?event=${e.id}`); if (!sm) continue;
       const cp = (((sm.header || {}).competitions) || [])[0] || {}, eq = {}, sc = {};
       for (const c of cp.competitors || []) { const tm = c.team || {}, k = c.homeAway === 'home' ? 'h' : 'a'; eq[k] = { id: String(tm.id || ''), nom: tm.shortDisplayName || tm.displayName || '', ab: tm.abbreviation || '', c: tm.color ? '#' + tm.color : '' }; sc[k] = parseInt(c.score, 10); }
       const f = { lg, s: sp, t, n: e.name || '', h: eq.h || {}, a: eq.a || {}, at: maintenant, r: 1, ty: tyE, ot: otE };
+      if (src !== lg) f.q = 1;   /* 20261106l : match de qualification */
       if (!isNaN(sc.h) && !isNaN(sc.a)) f.f = sc;
       const o = (sm.pickcenter || [])[0];
       if (o) {
