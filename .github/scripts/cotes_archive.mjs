@@ -59,12 +59,12 @@ function indexer(sp, lg) {   /* une passe par saison présente */
 }
 function indexerSaison(sp, lg, sa) {
   const B = BASE(sp, lg) + '/' + sa; let F = []; try { F = fs.readdirSync(`${B}/matchs`).filter((f) => /\.json$/.test(f)).sort(); } catch (e) { return; }
-  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 10 };   /* 20261106k : iv 10 = périodes m[12] */   /* 20261103i : iv 9 = cotes 1N2 m[11] */   /* 20261103f : iv 8 = total d'équipe m[10] */   /* 20261103d : iv 7 = total m[9] */   /* 20261103b : iv 6 = handicap m[8] dans les équipes */   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
+  const EQ = {}, JO = {}, ETAT = { n: 0, v2: 0, iv: 11 };   /* 20261106v : iv 11 = 1er but des tiers m[14] */   /* 20261106k : iv 10 = périodes m[12] */   /* 20261103i : iv 9 = cotes 1N2 m[11] */   /* 20261103f : iv 8 = total d'équipe m[10] */   /* 20261103d : iv 7 = total m[9] */   /* 20261103b : iv 6 = handicap m[8] dans les équipes */   /* 30/10 : iv 5 = étiquettes banc / absent m[7] */   /* iv 2 = index joueurs avec côté (20261031o) ; iv 3 = équipes avec adversaire (20261031q) */   /* 20261031k : etat.json = matchs finis / relus avec cf + REM (l'appli ne lit les joueurs qu'à v2 = n) */
   for (const f of F) {
     const mo = f.slice(0, 7); let D = {}; try { D = JSON.parse(fs.readFileSync(`${B}/matchs/${f}`, 'utf8')); } catch (e) { continue; }
     for (const [id, x] of Object.entries(D)) {
       if (x.f) { ETAT.n++; if (x.v2) ETAT.v2++; }
-      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null, (x.tot && x.tot.L != null && !isNaN(+x.tot.L)) ? +x.tot.L : null, (x.teq && x.teq[k] && x.teq[k].length && x.teq[k][0][0] != null) ? +x.teq[k][0][0] : null, (x.ml && (x.ml.h > 1 || x.ml.a > 1)) ? [k === 'h' ? x.ml.h || 0 : x.ml.a || 0, x.ml.d || 0, k === 'h' ? x.ml.a || 0 : x.ml.h || 0] : null, x.pe || null, x.q ? 1 : 0]);   /* 20261106l : m[13] = 1 si match de qualification (coupes d'Europe) */   /* 20261106k : m[12] = scores par période [[dom, ext], …] (même ordre que m[4]) */   /* 20261103i : m[11] = cotes de fermeture [victoire, nul, défaite] de l'ÉQUIPE */   /* 20261103f : m[10] = total de l'équipe (ligne du book) */   /* 20261103d : m[9] = total du match (ligne du book) */   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
+      for (const k of ['h', 'a']) { const t = x[k] || {}; if (!t.id) continue; const e = EQ[t.id] || (EQ[t.id] = { nom: t.nom, ab: t.ab, c: t.c, m: [] }); e.m.push([x.t, mo, id, k, x.f ? [x.f.h, x.f.a] : null, x.ty == null ? -1 : x.ty, x.ot || 0, (x[k === 'h' ? 'a' : 'h'] || {}).id || '', (x.hc && x.hc.L != null && !isNaN(+x.hc.L)) ? (k === 'h' ? +x.hc.L : -x.hc.L) : null, (x.tot && x.tot.L != null && !isNaN(+x.tot.L)) ? +x.tot.L : null, (x.teq && x.teq[k] && x.teq[k].length && x.teq[k][0][0] != null) ? +x.teq[k][0][0] : null, (x.ml && (x.ml.h > 1 || x.ml.a > 1)) ? [k === 'h' ? x.ml.h || 0 : x.ml.a || 0, x.ml.d || 0, k === 'h' ? x.ml.a || 0 : x.ml.h || 0] : null, x.pe || null, x.q ? 1 : 0, x.b1 || null]);   /* 20261106v : m[14] = 1er but de chaque tiers ['h'|'a'|''] */   /* 20261106l : m[13] = 1 si match de qualification (coupes d'Europe) */   /* 20261106k : m[12] = scores par période [[dom, ext], …] (même ordre que m[4]) */   /* 20261103i : m[11] = cotes de fermeture [victoire, nul, défaite] de l'ÉQUIPE */   /* 20261103f : m[10] = total de l'équipe (ligne du book) */   /* 20261103d : m[9] = total du match (ligne du book) */   /* 20261103b : m[8] = handicap de l'ÉQUIPE (ligne domicile, signe inversé à l'extérieur) */   /* 20261031q : + adversaire (m[7]) */   /* 20261031l : + type (-1 inconnu), prolongation */ }
       /* 30/10 : m[7] = étiquette du match où le joueur N'A PAS joué — 'B' banc, 'A:<statut> <motif>' absent annoncé, 'D:<raison>' n'a pas
          joué (US) ; m[4] reste null (l'appli ne compte comme joués que les matchs avec stats → les séries ne changent pas). */
       const tag = {}, nomT = {}, cotT = {};
@@ -106,7 +106,7 @@ const cotePb = (x) => { let d = dec((x.odds || {}).decimal); const ov = (x.curre
 const maintenant = Date.now(), fichiers = {};
 let nEv = 0, nJ = 0;
 // 20261031a : RATTRAPAGE=<ligue> (bouton du robot, 4 saisons passées) → seulement la partie rattrapage, en fin de fichier
-const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE || process.env.KHL_ARCH || process.env.IDX_LIGUE ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
+const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE || process.env.KHL_ARCH || process.env.IDX_LIGUE || process.env.B1_LIGUE ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
 for (const [sp, lg] of (RAT ? [] : LIGUES)) {
   const jours = [0, 1].map((k) => new Date(maintenant + k * 864e5).toISOString().slice(0, 10).replace(/-/g, ''));
   const vus = new Set();
@@ -215,13 +215,23 @@ function periodes(cs) {   /* 20261106k : competitors ESPN → [[dom, ext], …] 
   for (let i = 0; i < Math.max(H.length, A.length); i++) { const h = H[i] ? v(H[i]) : null, a = A[i] ? v(A[i]) : null; if (h == null || a == null) return out.length >= 3 ? out : null; out.push([h, a]); }
   return out.length >= 3 ? out : null;
 }
+/* 20261106v — 🏒 1er BUT DE CHAQUE TIERS (Antoine : « 1er but du tiers dans l'onglet Tiers-temps »). SONDÉ le 06/11 (console d'Antoine, summary NHL) :
+   plays[] filtrés scoringPlay, dans l'ordre du match, { period.number, clock, team.id } → f.b1 = ['h' | 'a' | ''] pour les tiers 1, 2, 3 ('' = aucun but). */
+function premiersButs(f, sm) {
+  const P = ((sm && sm.plays) || []).filter((x) => x && x.scoringPlay), b = ['', '', ''];
+  if (!P.length && !(f.pe && f.pe.slice(0, 3).every((x) => x[0] + x[1] === 0))) return null;
+  for (const x of P) { const n = +((x.period || {}).number); if (!(n >= 1 && n <= 3) || b[n - 1]) continue; const t = String((x.team || {}).id || ''); b[n - 1] = t === String((f.h || {}).id) ? 'h' : (t === String((f.a || {}).id) ? 'a' : '?'); }
+  return b.includes('?') ? null : b;
+}
+/* déduit sans fiche quand c'est sûr (une seule équipe a marqué dans le tiers, ou 0-0) ; null si les deux ont marqué */
+function b1DePe(pe) { if (!pe || pe.length < 3) return null; const b = []; for (let i = 0; i < 3; i++) { const [h, a] = pe[i]; if (h && a) return null; b.push(h ? 'h' : a ? 'a' : ''); } return b; }
 function feuille(f, sm, sp, id) {
   const kDe = (tid) => (String(tid) === String(f.h.id) ? 'h' : (String(tid) === String(f.a.id) ? 'a' : ''));
   const st = {};
   /* 20261106k — 🏒 TIERS-TEMPS (Antoine : « buts par tiers-temps à faire aussi, KHL et NHL » + captures des paris par tiers du book).
      SONDÉ le 06/11 (console d'Antoine, scoreboard NHL) : competitors[].linescores = [{ value, period 1/2/3(/4 prolongation) }] → f.pe = [[dom, ext], …]
      un couple par période, même ordre que f.f (domicile, extérieur). */
-  if (sp === 'hockey') { try { const pe = periodes((((sm.header || {}).competitions || [])[0] || {}).competitors); if (pe) f.pe = pe; } catch (e) {} }
+  if (sp === 'hockey') { try { const pe = periodes((((sm.header || {}).competitions || [])[0] || {}).competitors); if (pe) f.pe = pe; } catch (e) {} try { const b1 = premiersButs(f, sm); if (b1) f.b1 = b1; } catch (e) {} }
   const met = (id, n, k, cle, v) => { if (v == null || v === '' || +v === 0 || isNaN(+v) && cle !== 'TOI' && cle !== 'MIN') return; const o = st[id] || (st[id] = { n, k, s: {} }); o.s[cle] = isNaN(+v) ? v : +v; };
   if (sp === 'soccer') {
     // 20261031k (« on n'aura plus besoin des archives ESPN ? » → « go, fais en sorte ») : feuille d'ÉQUIPE pour les critères 4 saisons de l'appli,
@@ -419,7 +429,7 @@ if (process.env.KHL_ARCH) {
           h: { id: String(e.team_a.id), nom: e.team_a.name || '', ab: '', c: '', logo: e.team_a.image || '' }, a: { id: String(e.team_b.id), nom: e.team_b.name || '', ab: '', c: '', logo: e.team_b.image || '' },
           f: { h: sc[0], a: sc[1] }, ot: so ? 2 : (ot ? 1 : 0) };
         if (so && sc[0] === sc[1]) { if (so[0] > so[1]) f.f.h++; else if (so[1] > so[0]) f.f.a++; }
-        if (pe.every(Boolean)) { f.pe = pe; if (ot) f.pe.push(ot); }
+        if (pe.every(Boolean)) { f.pe = pe; if (ot) f.pe.push(ot); const d1 = b1DePe(f.pe); if (d1) f.b1 = d1; }   /* 20261106v : 1er but du tiers déduit quand c'est sûr */
         F[e.id] = f; nouv++;
       }
       if (!neufs) break;
@@ -436,6 +446,31 @@ if (process.env.KHL_ARCH) {
    limit=1000, comme le rattrapage) → linescores de chaque match fini → fiche.pe là où il manque, puis index refait (m[12]). */
 /* 20261106l — IDX_LIGUE=uefa.europa,… : index refait seulement (nouvelle colonne m[13]) */
 if (process.env.IDX_LIGUE) { for (const lgX of process.env.IDX_LIGUE.split(',')) { const L = LIGUES.find((x) => x[1] === lgX.trim()); if (L) indexer(L[0], L[1]); } process.exit(0); }
+/* 20261106v — B1_LIGUE=nhl : 1er but de chaque tiers pour les saisons archivées : déduit des scores de tiers quand c'est sûr, sinon summary ESPN (plays). */
+if (process.env.B1_LIGUE) {
+  const L = process.env.B1_LIGUE === 'khl' ? ['hockey', 'khl'] : LIGUES.find((x) => x[1] === process.env.B1_LIGUE); if (!L) { console.log('ligue inconnue'); process.exit(0); }   /* khl : déduction seule (pas de summary ESPN) */
+  const [sp, lg] = L, B = BASE(sp, lg); let sas = []; try { sas = fs.readdirSync(B).filter((d) => /^\d{4}(-\d{2})?$/.test(d)).sort(); } catch (e) {}
+  let nD = 0, nF = 0, nX = 0;
+  for (const sa of sas) {
+    let F = []; try { F = fs.readdirSync(`${B}/${sa}/matchs`).filter((f) => /\.json$/.test(f)); } catch (e) { continue; }
+    for (const f of F) {
+      const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
+      let maj = false; const ids = Object.keys(D).filter((id) => D[id].f && D[id].pe && !D[id].b1);
+      for (let i = 0; i < ids.length; i += 4) {
+        await Promise.all(ids.slice(i, i + 4).map(async (id) => {
+          const x = D[id], d = b1DePe(x.pe); if (d) { x.b1 = d; nD++; maj = true; return; }
+          if (lg === 'khl') { nX++; return; }
+          const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${id}`); if (!sm) { nX++; return; }
+          const b = premiersButs(x, sm); if (b) { x.b1 = b; nF++; maj = true; } else nX++;
+        }));
+        await pause(150);
+      }
+      if (maj) fs.writeFileSync(p, JSON.stringify(D));
+    }
+    console.log(`🏒 ${lg} ${sa} : 1er but des tiers — déduits ${nD}, fiches ${nF}, ratés ${nX} (cumul)`);
+  }
+  indexer(sp, lg); process.exit(0);
+}
 const PEL = process.env.PE_LIGUE || '';
 if (PEL) {
   const L = LIGUES.find((x) => x[1] === PEL); if (!L) { console.log('ligue inconnue ' + PEL); process.exit(0); }
