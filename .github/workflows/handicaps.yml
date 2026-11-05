@@ -8,7 +8,7 @@ on:
         required: false
         default: 'nba'
       mode:
-        description: 'handicaps (anciennes saisons), refaire (relit les lignes core) ou propbets (saison en cours : total équipe + lignes joueurs)'
+        description: 'handicaps (anciennes saisons), refaire (relit les lignes core) ou propbets (saison en cours : total équipe + lignes joueurs) ou tiers (scores par période, nhl)'
         required: false
         default: 'handicaps'
 permissions:
@@ -26,7 +26,8 @@ jobs:
           node-version: '22'
       - name: Handicaps ${{ inputs.ligue }}
         env:
-          HC_LIGUE: ${{ inputs.mode == 'propbets' && '' || inputs.ligue }}
+          HC_LIGUE: ${{ (inputs.mode == 'propbets' || inputs.mode == 'tiers') && '' || inputs.ligue }}
+          PE_LIGUE: ${{ inputs.mode == 'tiers' && inputs.ligue || '' }}
           PB_LIGUE: ${{ inputs.mode == 'propbets' && inputs.ligue || '' }}
           HC_REFAIRE: ${{ inputs.mode == 'refaire' && '1' || '' }}
         run: node .github/scripts/cotes_archive.mjs
@@ -37,7 +38,7 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add cotes 2>/dev/null || true
           if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
-          git commit -m "Handicaps ${{ inputs.ligue }} (core odds)"
+          git commit -m "Handicaps ${{ inputs.ligue }} (${{ inputs.mode }})"
           for i in 1 2 3 4 5 6; do
             git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
             git rebase --abort 2>/dev/null || true
