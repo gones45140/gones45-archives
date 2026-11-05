@@ -1,0 +1,44 @@
+# GONES45 — 🏒 archive KHL (20261106k, Antoine : « on n'a pas fait la KHL » → source khl.ru, « go »). Chaque matin : saison en cours ;
+# à la main avec ans = 5 : + les 4 saisons passées. Voir KHL_ARCH dans .github/scripts/cotes_archive.mjs.
+name: khl
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+    inputs:
+      ans:
+        description: 'Saisons à lire (1 = en cours, 5 = + 4 passées)'
+        required: false
+        default: '1'
+permissions:
+  contents: write
+concurrency:
+  group: khl
+jobs:
+  khl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Archive KHL
+        env:
+          KHL_ARCH: '1'
+          KHL_ANS: ${{ inputs.ans || '1' }}
+        run: node .github/scripts/cotes_archive.mjs
+      - name: Enregistrement
+        if: always()
+        run: |
+          git config user.name "Archive cotes"
+          git config user.email "actions@users.noreply.github.com"
+          git add cotes 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Archive KHL $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 7))
+          done
+          exit 1

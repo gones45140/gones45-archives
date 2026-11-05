@@ -106,7 +106,7 @@ const cotePb = (x) => { let d = dec((x.odds || {}).decimal); const ov = (x.curre
 const maintenant = Date.now(), fichiers = {};
 let nEv = 0, nJ = 0;
 // 20261031a : RATTRAPAGE=<ligue> (bouton du robot, 4 saisons passées) → seulement la partie rattrapage, en fin de fichier
-const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
+const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE || process.env.KHL_ARCH ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
 for (const [sp, lg] of (RAT ? [] : LIGUES)) {
   const jours = [0, 1].map((k) => new Date(maintenant + k * 864e5).toISOString().slice(0, 10).replace(/-/g, ''));
   const vus = new Set();
@@ -369,6 +369,67 @@ if (!RAT) console.log(`📦 cotes gardées : ${nEv} match(s), ${nJ} joueur(s) av
 // DraftKings, Caesars… dans cet ordre de préférence) → fiche.hc = { L, h, a, src: 'core' } (h / a = cotes si données), puis index refait.
 // 20261103f — PB_LIGUE=nba : matchs de la saison EN COURS sans total d'équipe → propBets DraftKings (100) relus (ESPN les garde après le match,
 // vérifié Jazz @ Spurs le lendemain) : 98 → fiche.teq ; lignes joueurs 1-4 / 87-90 ajoutées à fiche.j (nom pris dans la feuille st si besoin).
+/* ═══ 20261106k — 🏒 ARCHIVE KHL (Antoine : « on n'a pas fait la KHL, faudra le faire » → « notre site russe de la KHL » → « go »).
+   Source = khl.ru (webcaster) via le worker, comme l'appli (g45KhlApi). SONDÉ le 06/11 (console d'Antoine) : events_v2 (liste LÉGÈRE, 16 par page)
+   = { event: { id, khl_id, start_at, game_state_key « finished », type_id, team_a (DOMICILE) / team_b { id, name, image }, score « 5:0 »,
+   scores { first_period « 2:0 », second_period, third_period, overtime, bullitt } } } ; data.json = stages « Regular 2026/2027 » / « Play-off ».
+   KHL_ARCH=1 : saison en cours (KHL_ANS=5 → + les 4 précédentes) → cotes/hockey/khl/<saison>/matchs/AAAA-MM.json, même fiche que l'ESPN
+   (h / a, f score final, ty 2 saison régulière / 3 séries, ot 1 prolongation / 2 tirs au but, pe tiers [[dom, ext], …], r: 1), puis index.
+   Tirs au but : score khl.ru SANS le tir au but décisif → +1 au vainqueur (comme ESPN pour la NHL). */
+if (process.env.KHL_ARCH) {
+  const W = 'https://fd-proxy.touraine-antoine.workers.dev/?host=khl&path=';
+  const khl = async (fic, q) => {
+    const u = W + encodeURIComponent('/' + fic + '.json?locale=en' + (q ? '&' + q : ''));
+    for (let i = 0; i < 4; i++) {
+      try { const c = new AbortController(), tm = setTimeout(() => c.abort(), 40000); const r = await fetch(u, { signal: c.signal }); clearTimeout(tm);
+        if (r.ok) { const t = await r.text(); if (/^\s*[\[{]/.test(t)) return JSON.parse(t); } } catch (e) {}
+      await pause(4000 * (i + 1));   /* 522 fréquent : le worker finit la lecture et la garde, le 2e essai tombe souvent dessus */
+    }
+    return null;
+  };
+  const data = await khl('data', ''); const ST = {};
+  (function desc(o, d) { if (!o || typeof o !== 'object' || d > 12) return; if (Array.isArray(o)) { o.forEach((x) => desc(x, d + 1)); return; }
+    const nm = o.name || o.title; if (o.id && typeof nm === 'string') { const m = nm.match(/(\d{4})\s*\/\s*(\d{4})/); if (m) { const po = /play\s*-?\s*off|cup/i.test(nm), rg = /regular/i.test(nm); if (po || rg) { (ST[m[2]] = ST[m[2]] || {})[po ? 'po' : 'reg'] = +o.id; } } }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') desc(o[k], d + 1); })(data, 0);
+  const cur = data && +data.current_stage_id;
+  const ans = Object.keys(ST).sort().slice(-(+process.env.KHL_ANS || 1));
+  const stages = []; for (const an of ans) for (const k of ['reg', 'po']) if (ST[an][k]) stages.push([ST[an][k], k === 'po' ? 3 : 2]);
+  if (cur && !stages.some((x) => x[0] === cur)) stages.push([cur, 2]);
+  console.log('🏒 KHL stages : ' + JSON.stringify(stages) + ' (data ' + (data ? 'lu' : 'ILLISIBLE') + ')');
+  const fic = {}, lireF = (mo) => { if (!fic[mo]) { try { fic[mo] = JSON.parse(fs.readFileSync(FMOIS('hockey', 'khl', mo), 'utf8')); } catch (e) { fic[mo] = {}; } } return fic[mo]; };
+  const pr = (x) => { const q = String(x || '').split(':'); if (q.length !== 2) return null; const a = parseInt(q[0], 10), b = parseInt(q[1], 10); return isNaN(a) || isNaN(b) ? null : [a, b]; };
+  let n = 0, nouv = 0;
+  for (const [stage, ty] of stages) {
+    const vus = new Set();
+    for (let page = 1; page <= 90; page++) {
+      const j = await khl('events_v2', `stage_id=${stage}&order_direction=asc&page=${page}`);
+      if (!Array.isArray(j) || !j.length) { if (j === null) console.log(`⚠️ stage ${stage} page ${page} illisible`); break; }
+      let neufs = 0;
+      for (const it of j) {
+        const e = (it && it.event) || it; if (!e || !e.id || vus.has(e.id)) continue; vus.add(e.id); neufs++;
+        if (e.game_state_key !== 'finished' || !e.team_a || !e.team_b) continue;
+        const sc = pr(e.score); if (!sc) continue;
+        const t = +e.start_at < 1e12 ? +e.start_at * 1000 : +e.start_at; if (!t) continue;
+        const mo = new Date(t).toISOString().slice(0, 7), F = lireF(mo), S = e.scores || {};
+        if (F[e.id] && F[e.id].pe) continue; n++;
+        const pe = [pr(S.first_period), pr(S.second_period), pr(S.third_period)]; const ot = pr(S.overtime), so = pr(S.bullitt);
+        const f = { lg: 'khl', s: 'hockey', t, n: (e.team_b.name || '') + ' at ' + (e.team_a.name || ''), at: maintenant, r: 1, ty, src: 'khl', kid: e.khl_id || null,
+          h: { id: String(e.team_a.id), nom: e.team_a.name || '', ab: '', c: '', logo: e.team_a.image || '' }, a: { id: String(e.team_b.id), nom: e.team_b.name || '', ab: '', c: '', logo: e.team_b.image || '' },
+          f: { h: sc[0], a: sc[1] }, ot: so ? 2 : (ot ? 1 : 0) };
+        if (so && sc[0] === sc[1]) { if (so[0] > so[1]) f.f.h++; else if (so[1] > so[0]) f.f.a++; }
+        if (pe.every(Boolean)) { f.pe = pe; if (ot) f.pe.push(ot); }
+        F[e.id] = f; nouv++;
+      }
+      if (!neufs) break;
+      await pause(400);
+    }
+    console.log(`🏒 KHL stage ${stage} : ${vus.size} matchs lus (cumul ${nouv} gardés)`);
+  }
+  for (const [mo, F] of Object.entries(fic)) if (Object.keys(F).length) { const p = FMOIS('hockey', 'khl', mo); fs.mkdirSync(p.replace(/\/[^/]+$/, ''), { recursive: true }); fs.writeFileSync(p, JSON.stringify(F)); }
+  if (nouv) indexer('hockey', 'khl');
+  console.log(`📦 KHL : ${nouv} match(s) ajoutés`);
+  process.exit(0);
+}
 /* 20261106k — 🏒 PE_LIGUE=nhl : scores par TIERS des saisons déjà archivées, sans relire chaque feuille : scoreboard PAR MOIS (dates=AAAAMM,
    limit=1000, comme le rattrapage) → linescores de chaque match fini → fiche.pe là où il manque, puis index refait (m[12]). */
 const PEL = process.env.PE_LIGUE || '';
