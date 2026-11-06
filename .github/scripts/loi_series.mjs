@@ -18,7 +18,7 @@ const LIGUES = [
 ];
 const SPN = { soccer: 'foot', hockey: 'hockey', basketball: 'basket', football: 'football-us', baseball: 'baseball', rugby: 'rugby', 'rugby-league': 'rugby-xiii' };
 const US = new Set(['hockey', 'basketball', 'football', 'baseball']);
-const NSAI = 5, MIN_N = 20, PIRE_MIN = 3, PIRE_MAX = 7, H24 = 24 * 3600e3;   // 20261105t : « série 3 matchs mini, 1 et 2 c'est tellement courant »
+const NSAI = 5, MIN_N = 20, PIRE_MIN = 3, PIRE_MAX = 7, COURS_MIN = 3, H24 = 24 * 3600e3;   // 20261107p : « 2/3, j'avais dit à partir de 3 » → 3 ratés de suite EN COURS au moins   // 20261105t : « série 3 matchs mini, 1 et 2 c'est tellement courant »
 
 /* Paris regardés (maquette validée) : f(pour, contre, prolongation) → réussi ? */
 const PARIS = {
@@ -106,7 +106,7 @@ for (const [sp, lg] of LIGUES) {
           for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
             const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
             const R = serie(ms, f);
-            if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < 1 || R.pire - R.cours > 1) continue;
+            if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1) continue;
             const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;   // même chiffre en 🏠 et partout : une seule ligne
             out.push({ sp, lg, ligue, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
               d: dom ? 1 : 0, lieu, k, lib,
@@ -151,7 +151,7 @@ for (const [sp, lg] of LIGUES) {
             for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
               const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
               const R = serie(ms, f);
-              if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < 1 || R.pire - R.cours > 1) continue;
+              if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1) continue;
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
               out.push({ sp: 'hockey', lg: 'khl', ligue: 'KHL', eid: 'khl' + e.id, t, id: String(co.id), eq: E.nom || co.name || '', adv: adv.name || '', d: dom ? 1 : 0, lieu, k, lib,
                 llogo: '', logo: co.image || '', c: '', alogo: adv.image || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined,
