@@ -180,7 +180,7 @@ console.log(`Loi des sÃ©ries : ${nMatchs} matchs dans les 24 h, ${out.length} pÃ
   const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   let neufs = 0, regles = 0;
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
-    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', r: null }); }
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', c: x.c || '', r: null }); }   /* 20261107r : + couleur (fond de la carte) */
   for (const x of H.L) {
     if (x.r != null || x.t > now - 3 * 3600e3) continue;
     const f = ((PARIS[x.sp] || []).find((p) => p[0] === x.k) || [])[2]; if (!f) continue;
