@@ -171,6 +171,31 @@ fs.mkdirSync('loi', { recursive: true });
 fs.writeFileSync('loi/loi_series.json', JSON.stringify({ at: now, n: nMatchs, s: NSAI, L: out }));
 console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} pépites`);
 
+/* ═══ 20261107q — 📒 HISTORIQUE DES PÉPITES (Antoine : « balancer dans Tendances et archiver, je veux contrôler un truc » → bilan + calendrier,
+   maquette « oui ») : chaque pépite du matin est GARDÉE (loi/historique.json, une ligne par match / équipe / pari / lieu) ; les jours suivants,
+   le résultat est relu dans les archives (equipes/<id>.json de la saison, m[2] = n° du match, m[4] = score, m[6] = prolongation) :
+   r = 1 → le pari a gagné (la série s'est arrêtée), 0 → encore raté ; sc = « pour-contre ». Pas trouvé 10 jours après → r = -1 (annulé / reporté). ═══ */
+{
+  const H = lireJ('loi/historique.json') || { L: [] }, cle = (x) => [x.eid, x.id, x.k, x.lieu].join('|'), vus = new Set(H.L.map(cle));
+  const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
+  let neufs = 0, regles = 0;
+  for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', r: null }); }
+  for (const x of H.L) {
+    if (x.r != null || x.t > now - 3 * 3600e3) continue;
+    const f = ((PARIS[x.sp] || []).find((p) => p[0] === x.k) || [])[2]; if (!f) continue;
+    const base = `cotes/${SPN[x.sp]}/${x.lg}`, eid = String(x.eid).replace(/^khl/, '');
+    let sa = []; try { sa = fs.readdirSync(base).filter((q) => /^\d{4}(-\d{2})?$/.test(q)).sort().slice(-2); } catch (e) {}
+    let m = null; for (const s0 of sa) { const q = lireJ(`${base}/${s0}/equipes/${x.id}.json`); const y = q && (q.m || []).find((z) => String(z[2]) === eid); if (y) m = y; }
+    if (m && m[4] && m[4][0] != null && m[4][1] != null) { const dom = m[3] === 'h', p = dom ? +m[4][0] : +m[4][1], c = dom ? +m[4][1] : +m[4][0];
+      x.r = f(p, c, m[6] ? 1 : 0) ? 1 : 0; x.sc = p + '-' + c + (US.has(x.sp) && m[6] ? ' (prol.)' : ''); regles++; }
+    else if (x.t < now - 10 * 864e5) { x.r = -1; regles++; }
+  }
+  H.L.sort((a, b) => b.t - a.t); H.at = now;
+  fs.writeFileSync('loi/historique.json', JSON.stringify(H));
+  console.log(`Historique : ${H.L.length} pépites gardées (${neufs} nouvelles, ${regles} résultats lus)`);
+}
+
 /* 20261106i — 🔎 CRITÈRES DANS LE COCKPIT (Antoine : « si je veux Edmonton pour regarder ce que ça donne je suis obligé d'aller dans
    Compétitions / sport / équipe… parce que pas dans mon mur ») : index de TOUTES les équipes des championnats archivés, pour la recherche
    de l'appli. Nom complet ESPN (miroir standings.json, ex. « Paris Saint-Germain » : le foot retrouve l'équipe PAR LE NOM) ; sinon le nom
