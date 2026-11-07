@@ -4,6 +4,10 @@ name: loi-series
 on:
   schedule:
     - cron: '41 5 * * *'   # ≈ 6 h 41 à Paris l'hiver (minute décalée : GitHub est saturé à la minute 0)
+    # 07/11 (Antoine : « que 2 pépites ? ») : le passage de 6 h 41 n'a PAS été lancé par GitHub ce jour-là (dernier : 06/11 14 h 12) →
+    # 2 passages de secours ; le robot réécrit simplement la liste du jour, sans doublon dans l'historique.
+    - cron: '23 7 * * *'   # ≈ 8 h 23 à Paris
+    - cron: '47 10 * * *'  # ≈ 11 h 47 à Paris
   workflow_dispatch:
 concurrency:
   group: loi-series
