@@ -69,7 +69,7 @@ function matchsEquipe(sp, lg, id) {
 /* ═══ 20261113h — 🌍 SÉLECTIONS NATIONALES (Antoine : « pour les sélections on a quoi ? » → « OUI on part là-dessus ») : une sélection joue
    ≈ 10 matchs par an sur PLUSIEURS compétitions → ses matchs des 5 dernières années civiles, TOUTES compétitions archivées mélangées par date
    (amicaux compris). La pépite garde lg = compétition du match à venir (résultat relu ensuite dans ce dossier) et sel: 1. ═══ */
-const SEL = ['fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro'];
+const SEL = ['fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro', 'uefa.euroq', 'conmebol.america', 'caf.nations', 'caf.nations_qual', 'fifa.worldq.conmebol', 'fifa.worldq.caf', 'fifa.worldq.afc', 'fifa.worldq.concacaf', 'fifa.worldq.ofc', 'concacaf.gold', 'concacaf.nations.league', 'afc.asian.cup'];   /* 20261113j : + qualifs Euro, Copa, CAN, qualifs CDM des autres continents… */
 function matchsSel(id) {
   const y0 = new Date().getFullYear(), L = []; let nom = '';
   const sa = []; for (let y = y0 - NSAI + 1; y <= y0; y++) sa.push(String(y));

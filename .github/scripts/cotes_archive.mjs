@@ -14,6 +14,10 @@ const LIGUES = [
   // 20261031d (« il manque rien ? » → ligues ESPN du mur d'Antoine : Dodgers, PSV, Palmeiras, Boca, France… « ok ») :
   ['baseball', 'mlb'], ['soccer', 'ned.1'], ['soccer', 'por.1'], ['soccer', 'fra.2'], ['soccer', 'bra.1'], ['soccer', 'arg.1'],
   ['soccer', 'fifa.friendly'], ['soccer', 'uefa.nations'], ['soccer', 'fifa.worldq.uefa'], ['soccer', 'fifa.world'], ['soccer', 'uefa.euro'],
+  // 20261113j (Antoine : sélections, « il manque qualifs Euro, Copa, CAN… » → « oui ») : SONDÉ le 13/11 (scoreboard ?dates=AAAAMM, robot sonde) :
+  // uefa.euroq 2023 = 230 matchs (France 8), conmebol.america 2024 = 32, caf.nations 2024 = 52, caf.nations_qual, qualifs CDM des 5 autres
+  // confédérations, concacaf.gold, concacaf.nations.league, afc.asian.cup 2024 = 51 (afc.asian = 400, mauvais code)
+  ['soccer', 'uefa.euroq'], ['soccer', 'conmebol.america'], ['soccer', 'caf.nations'], ['soccer', 'caf.nations_qual'], ['soccer', 'fifa.worldq.conmebol'], ['soccer', 'fifa.worldq.caf'], ['soccer', 'fifa.worldq.afc'], ['soccer', 'fifa.worldq.concacaf'], ['soccer', 'fifa.worldq.ofc'], ['soccer', 'concacaf.gold'], ['soccer', 'concacaf.nations.league'], ['soccer', 'afc.asian.cup'],
   // 30/10 (« en rugby rien n'est monté ? » → Top 14 « oui ») : ESPN 270559 = calendrier, scores, compos (23 numéros) ; ni cotes, ni essais (sondé)
   ['rugby', '270559'],
   // 20261103k (sondes du 03/11 → « oui ») : stats joueurs rugby DISPONIBLES (essais…) ; + Champions Cup, Six Nations, NRL (rugby à XIII)
@@ -22,7 +26,7 @@ const LIGUES = [
   ['rugby', '272073']
 ];
 // saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
-const CIVIL = new Set(['180659', '3', 'mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro']);
+const CIVIL = new Set(['180659', '3', 'mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro', 'uefa.euroq', 'conmebol.america', 'caf.nations', 'caf.nations_qual', 'fifa.worldq.conmebol', 'fifa.worldq.caf', 'fifa.worldq.afc', 'fifa.worldq.concacaf', 'fifa.worldq.ofc', 'concacaf.gold', 'concacaf.nations.league', 'afc.asian.cup']);   /* 20261113j */
 // types propBets gardés (sondés par Antoine, 30/10) : joueurs + buts d'équipe + les deux marquent
 /* 20261103f (Antoine : « total pts équipe il propose un cut ? » → « oui ») — NBA en plus, SONDÉ le 03/11 (Jazz @ Spurs 401909917) : 98 Team Total
    Points (ligne du total d'une ÉQUIPE, rangée comme les buts d'équipe → fiche.teq), et les VRAIES lignes over / under des joueurs : 1 Total Points,
