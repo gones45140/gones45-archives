@@ -9,16 +9,16 @@ jobs:
           cat > s.mjs <<'X'
           const H = { headers: { 'User-Agent': 'Mozilla/5.0 (GONES45 archive)' } };
           const J = async (u) => { try { const r = await fetch(u, H); return r.ok ? await r.json() : { _st: r.status }; } catch (e) { return { _st: 'err' }; } };
-          const L = [];
-          for (let p = 1; p <= 6; p++) { const j = await J(`https://sports.core.api.espn.com/v2/sports/rugby/leagues?limit=100&page=${p}`); const it = j.items || []; if (!it.length) break;
-            for (const x of it) { const q = await J(x.$ref); L.push([String(q.id), q.name || q.displayName || '', q.abbreviation || '']); } }
-          console.log('LIGUES', L.length); for (const x of L) console.log('LG', x.join(' | '));
-          const C = L.filter((x) => /nation|test|world|summer|autumn|pacific|championship|tour|international|lions/i.test(x[1]));
-          for (const [id, nom] of C) { const o = [];
-            for (const y of [2022, 2023, 2024, 2025, 2026]) { let n = 0, fr = 0, st = '';
-              for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); const j = await J(`https://site.api.espn.com/apis/site/v2/sports/rugby/${id}/scoreboard?dates=${y}${mm}&limit=500`);
-                if (j._st) { st = j._st; continue; } const ev = j.events || []; n += ev.length; fr += ev.filter((e) => /France/.test(e.name || '')).length; }
-              o.push(y + ':' + n + (fr ? '(FR' + fr + ')' : '') + (st ? '[' + st + ']' : '')); }
-            console.log('SONDE', id, nom, '→', o.join(' ')); }
+          for (const id of ['8016','8337','8323','8328','24400','10659','19940']) { const q = await J(`https://sports.core.api.espn.com/v2/sports/rugby/leagues/${id}`);
+            console.log('CORE', id, q.name, 'slug=' + q.slug, 'mid=' + q.midsizeName, JSON.stringify((q.links || []).map((l) => l.href)).slice(0, 300)); }
+          for (const se of [2022, 2023, 2024, 2025, 2026, 2027]) { const j = await J(`https://site.api.espn.com/apis/site/v2/sports/rugby/180659/teams/9/schedule?season=${se}`);
+            if (j._st) { console.log('SCHED', se, j._st); continue; }
+            const ev = j.events || []; const c = {};
+            for (const e of ev) { const k = (e.league && (e.league.id + ' ' + (e.league.name || e.league.abbreviation))) || (e.seasonType && e.seasonType.name) || '?'; c[k] = (c[k] || 0) + 1; }
+            console.log('SCHED', se, ev.length, JSON.stringify(c), ev.slice(0, 2).map((e) => e.name + ' ' + e.date + ' ' + JSON.stringify(e.league || {}).slice(0, 150)).join(' || ')); }
+          for (const id of ['164205', '244293', '289234', '289237', '289262', '289271', '270555', '270557', '267979', '282', '283']) { let n = 0, fr = 0, nom = '', st = '';
+            for (const ym of ['202307', '202309', '202310', '202411', '202507', '202511', '202607', '202611']) { const j = await J(`https://site.api.espn.com/apis/site/v2/sports/rugby/${id}/scoreboard?dates=${ym}&limit=500`);
+              if (j._st) { st = j._st; continue; } const ev = j.events || []; n += ev.length; fr += ev.filter((e) => /France/.test(e.name || '')).length; nom = nom || ((j.leagues || [])[0] || {}).name || ''; }
+            console.log('SITE', id, nom, n, fr ? 'FR' + fr : '', st); }
           X
           node s.mjs
