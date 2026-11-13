@@ -1,0 +1,19 @@
+# 20261113j — sonde temporaire (codes ESPN des compétitions de sélections manquantes) ; à supprimer après usage.
+name: sonde
+on: workflow_dispatch
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat > s.mjs <<'X'
+          const L = ['uefa.euroq','conmebol.america','caf.nations','caf.nations_qual','fifa.worldq.conmebol','fifa.worldq.caf','fifa.worldq.afc','fifa.worldq.concacaf','fifa.worldq.ofc','concacaf.gold','concacaf.nations.league','afc.asian.cup','afc.asian','fifa.worldq.uefa','uefa.nations'];
+          for (const lg of L) { const o = [];
+            for (const y of [2022, 2023, 2024, 2025, 2026]) {
+              try { const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lg}/scoreboard?dates=${y}0101-${y}1231&limit=1000`); if (!r.ok) { o.push(y + ':' + r.status); continue; }
+                const j = await r.json(); const ev = j.events || []; const fr = ev.filter(e => JSON.stringify(e.competitions?.[0]?.competitors?.map(c => c.team?.id)).includes('"478"')).length;
+                o.push(y + ':' + ev.length + (fr ? '(FR' + fr + ')' : '')); if (y === 2025 && ev[0]) o.push('ex=' + ev[0].name + ' ' + ev[0].date + ' ' + ((j.leagues || [])[0] || {}).name);
+              } catch (e) { o.push(y + ':err'); } }
+            console.log('SONDE', lg, o.join(' ')); }
+          X
+          node s.mjs
