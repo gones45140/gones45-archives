@@ -11,7 +11,7 @@ jobs:
           for (const lg of L) { const o = [];
             for (const y of [2022, 2023, 2024, 2025, 2026]) { let n = 0, fr = 0, st = '', ex = '', nom = '';
               for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0');
-                try { const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lg}/scoreboard?dates=${y}${mm}01-${y}${mm}28&limit=300`); if (!r.ok) { st = r.status; continue; }
+                try { const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${lg}/scoreboard?dates=${y}${mm}&limit=1000`, { headers: { 'User-Agent': 'Mozilla/5.0 (GONES45 archive)' } }); if (!r.ok) { st = r.status; continue; }
                   const j = await r.json(); const ev = j.events || []; n += ev.length; nom = nom || ((j.leagues || [])[0] || {}).name || '';
                   fr += ev.filter(e => JSON.stringify(e.competitions?.[0]?.competitors?.map(c => c.team?.id)).includes('"478"')).length; if (!ex && ev[0]) ex = ev[0].name;
                 } catch (e) { st = 'err'; } }
