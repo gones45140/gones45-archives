@@ -1,4 +1,4 @@
-# 20261113l — sonde temporaire (photos ESPN des joueurs de rugby) ; à supprimer après usage.
+# 20261113l — sonde temporaire (photos TheSportsDB des joueurs de rugby) ; à supprimer après usage.
 name: sonde
 on: workflow_dispatch
 jobs:
@@ -6,5 +6,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          for id in 220673 245267 301864; do for u in "https://a.espncdn.com/i/headshots/rugby/players/full/$id.png" "https://a.espncdn.com/combiner/i?img=/i/headshots/rugby/players/full/$id.png&w=88&h=88"; do echo "PH $id $(curl -s -o /dev/null -w '%{http_code} %{content_type} %{size_download}' "$u") $u"; done; done
-          curl -s "https://site.web.api.espn.com/apis/common/v3/sports/rugby/athletes/220673" -A "Mozilla/5.0" | head -c 600; echo
+          for p in "Malcolm%20Marx" "Malcolm_Marx" "Antoine%20Dupont" "Theo%20Attissogbe" "Cheslin%20Kolbe" "Maxime%20Lucu"; do echo "TSDB $p"; curl -s "https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=$p" | node -e "let s='';process.stdin.on('data',x=>s+=x).on('end',()=>{try{const j=JSON.parse(s);(j.player||[]).slice(0,3).forEach(x=>console.log('  ',x.strPlayer,'|',x.strSport,'|',x.strTeam,'|thumb',!!x.strThumb,'|cut',!!x.strCutout,'|render',!!x.strRender))}catch(e){console.log('  err',s.slice(0,100))}})"; done
