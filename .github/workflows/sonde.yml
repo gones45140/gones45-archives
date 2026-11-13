@@ -1,0 +1,24 @@
+# 20261113k — sonde temporaire (rugby : codes ESPN des matchs internationaux) ; à supprimer après usage.
+name: sonde
+on: workflow_dispatch
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          cat > s.mjs <<'X'
+          const H = { headers: { 'User-Agent': 'Mozilla/5.0 (GONES45 archive)' } };
+          const J = async (u) => { try { const r = await fetch(u, H); return r.ok ? await r.json() : { _st: r.status }; } catch (e) { return { _st: 'err' }; } };
+          const L = [];
+          for (let p = 1; p <= 6; p++) { const j = await J(`https://sports.core.api.espn.com/v2/sports/rugby/leagues?limit=100&page=${p}`); const it = j.items || []; if (!it.length) break;
+            for (const x of it) { const q = await J(x.$ref); L.push([String(q.id), q.name || q.displayName || '', q.abbreviation || '']); } }
+          console.log('LIGUES', L.length); for (const x of L) console.log('LG', x.join(' | '));
+          const C = L.filter((x) => /nation|test|world|summer|autumn|pacific|championship|tour|international|lions/i.test(x[1]));
+          for (const [id, nom] of C) { const o = [];
+            for (const y of [2022, 2023, 2024, 2025, 2026]) { let n = 0, fr = 0, st = '';
+              for (let m = 1; m <= 12; m++) { const mm = String(m).padStart(2, '0'); const j = await J(`https://site.api.espn.com/apis/site/v2/sports/rugby/${id}/scoreboard?dates=${y}${mm}&limit=500`);
+                if (j._st) { st = j._st; continue; } const ev = j.events || []; n += ev.length; fr += ev.filter((e) => /France/.test(e.name || '')).length; }
+              o.push(y + ':' + n + (fr ? '(FR' + fr + ')' : '') + (st ? '[' + st + ']' : '')); }
+            console.log('SONDE', id, nom, '→', o.join(' ')); }
+          X
+          node s.mjs
