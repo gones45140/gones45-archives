@@ -278,6 +278,11 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
     for (const lg of SEL) { let sa = []; try { sa = fs.readdirSync(`cotes/foot/${lg}`).filter((x) => /^\d{4}$/.test(x)); } catch (e) {}
       for (const s of sa) { const q = lireJ(`cotes/foot/${lg}/${s}/equipes.json`) || {}; for (const id of Object.keys(q)) if (q[id] && q[id][0] && !vS[id]) vS[id] = q[id][0]; } }
     for (const id of Object.keys(vS)) IX.push(['soccer', 'sel', 'Sélections', String(id), vS[id], `https://a.espncdn.com/i/teamlogos/soccer/500/${id}.png`]); }
+  /* 20261113k : sélections de RUGBY (Six Nations, Nations Championship, Coupe du monde, tests), lg 'rsel' */
+  { const vR = {};
+    for (const lg of ['180659', '17567', '164205', '289234']) { let sa = []; try { sa = fs.readdirSync(`cotes/rugby/${lg}`).filter((x) => /^\d{4}$/.test(x)); } catch (e) {}
+      for (const s of sa) { const q = lireJ(`cotes/rugby/${lg}/${s}/equipes.json`) || {}; for (const id of Object.keys(q)) if (q[id] && q[id][0] && !vR[id]) vR[id] = q[id][0]; } }
+    for (const id of Object.keys(vR)) IX.push(['rugby', 'rsel', 'Sélections rugby', String(id), vR[id], `https://a.espncdn.com/i/teamlogos/rugby/teams/500/${id}.png`]); }
   IX.sort((a, b) => a[4].localeCompare(b[4], 'fr'));
   fs.writeFileSync('loi/equipes.json', JSON.stringify({ at: now, L: IX }));
   console.log(`Index équipes : ${IX.length}`);
