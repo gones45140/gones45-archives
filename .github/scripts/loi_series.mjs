@@ -66,6 +66,26 @@ function matchsEquipe(sp, lg, id) {
   return { nom, L, sa };
 }
 
+/* ═══ 20261113h — 🌍 SÉLECTIONS NATIONALES (Antoine : « pour les sélections on a quoi ? » → « OUI on part là-dessus ») : une sélection joue
+   ≈ 10 matchs par an sur PLUSIEURS compétitions → ses matchs des 5 dernières années civiles, TOUTES compétitions archivées mélangées par date
+   (amicaux compris). La pépite garde lg = compétition du match à venir (résultat relu ensuite dans ce dossier) et sel: 1. ═══ */
+const SEL = ['fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro'];
+function matchsSel(id) {
+  const y0 = new Date().getFullYear(), L = []; let nom = '';
+  const sa = []; for (let y = y0 - NSAI + 1; y <= y0; y++) sa.push(String(y));
+  for (const lg of SEL) for (const s of sa) {
+    const q = lireJ(`cotes/foot/${lg}/${s}/equipes/${id}.json`); if (!q || !q.m) continue;
+    nom = q.nom || nom;
+    for (const m of q.m) {
+      if (!m || !m[4] || m[4][0] == null || m[4][1] == null) continue;
+      const d = m[3] === 'h';
+      L.push({ t: m[0], sa: s, d, p: d ? +m[4][0] : +m[4][1], c: d ? +m[4][1] : +m[4][0], ot: m[6] ? 1 : 0, q: 0, lg });
+    }
+  }
+  L.sort((a, b) => a.t - b.t);
+  return { nom, L, sa };
+}
+
 /* 20261106l (Plzeň : « la stat ne prenait peut-être pas en compte les qualifs, donc reste vrai » → « A + ») : séries sur la PHASE PRINCIPALE
    seulement (qualifications sautées) ; qv = date de la dernière réussite EN QUALIFICATION pendant la série en cours (mention ⚠️ sur la carte). */
 function serie(ms0, f) {
@@ -117,6 +137,42 @@ for (const [sp, lg] of LIGUES) {
       }
     }
   }
+}
+/* 20261113h : pépites des sélections (matchs des 24 h de chaque compétition, séries sur toutes les compétitions) */
+{
+  let nS = 0, pS = 0; const vus = new Set();
+  for (const lg of SEL) {
+    for (const j of [...new Set([jour(now), jour(fin)])]) {
+      const sb = await scoreboard('soccer', lg, j); if (!sb) continue;
+      const ligue = (sb.leagues && sb.leagues[0] && (sb.leagues[0].abbreviation || sb.leagues[0].name)) || lg;
+      const LG = ((sb.leagues && sb.leagues[0] && sb.leagues[0].logos) || []), lgD = LG.find((x) => (x.rel || []).includes('dark')) || LG[0];
+      for (const ev of sb.events || []) {
+        const t = Date.parse(ev.date); if (!(t > now && t <= fin) || vus.has(ev.id)) continue;
+        const st = ev.status && ev.status.type && ev.status.type.state; if (st && st !== 'pre') continue;
+        vus.add(ev.id); nMatchs++; nS++;
+        const cs = (ev.competitions && ev.competitions[0] && ev.competitions[0].competitors) || [];
+        for (const co of cs) {
+          const id = co.team && co.team.id; if (!id) continue;
+          const adv = cs.find((x) => x !== co), dom = co.homeAway === 'home';
+          const E = matchsSel(id); if (!E.L.length) continue;
+          for (const [k, lib, f] of PARIS.soccer) {
+            const vu = {};
+            for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
+              const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
+              const R = serie(ms, f);
+              if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1) continue;
+              const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
+              out.push({ sp: 'soccer', lg, ligue, sel: 1, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
+                d: dom ? 1 : 0, lieu, k, lib, llogo: (lgD && lgD.href) || '', logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '',
+                pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
+              pS++;
+            }
+          }
+        }
+      }
+    }
+  }
+  console.log(`Sélections : ${nS} matchs dans les 24 h, ${pS} pépites`);
 }
 /* ═══ 20261106u — 🏒 KHL DANS LES PÉPITES (Antoine : « KHL dans les pépites du jour de la Loi des séries ; go »). Matchs des 24 h = khl.ru
    events_v2 par dates (q[start_at_gt/lt_time_from_unixtime], comme l'appli) via le worker ; team_a = domicile ; archives cotes/hockey/khl
@@ -217,6 +273,11 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
       IX.push([sp, lg, ligN || lg, String(id), nom, (noms[id] && noms[id][1]) || (sp === 'rugby' ? `https://a.espncdn.com/i/teamlogos/rugby/teams/500/${id}.png` : '')]);
     }
   }
+  /* 20261113h : sélections nationales (toutes celles vues dans les compétitions archivées), lg 'sel' ; l'appli met le nom français */
+  { const vS = {};
+    for (const lg of SEL) { let sa = []; try { sa = fs.readdirSync(`cotes/foot/${lg}`).filter((x) => /^\d{4}$/.test(x)); } catch (e) {}
+      for (const s of sa) { const q = lireJ(`cotes/foot/${lg}/${s}/equipes.json`) || {}; for (const id of Object.keys(q)) if (q[id] && q[id][0] && !vS[id]) vS[id] = q[id][0]; } }
+    for (const id of Object.keys(vS)) IX.push(['soccer', 'sel', 'Sélections', String(id), vS[id], `https://a.espncdn.com/i/teamlogos/soccer/500/${id}.png`]); }
   IX.sort((a, b) => a[4].localeCompare(b[4], 'fr'));
   fs.writeFileSync('loi/equipes.json', JSON.stringify({ at: now, L: IX }));
   console.log(`Index équipes : ${IX.length}`);
