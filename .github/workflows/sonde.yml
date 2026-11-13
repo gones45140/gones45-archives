@@ -1,9 +1,0 @@
-# 20261114b — sonde temporaire (classement ESPN rugby Nations Championship : noms des stats) ; à supprimer après usage.
-name: sonde
-on: workflow_dispatch
-jobs:
-  s:
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          for u in "https://site.api.espn.com/apis/v2/sports/rugby/17567/standings?season=2026" "https://site.api.espn.com/apis/v2/sports/rugby/180659/standings?season=2026" "https://site.api.espn.com/apis/v2/sports/rugby/270559/standings?season=2026"; do echo "URL $u"; curl -s -A "Mozilla/5.0" "$u" | node -e "let s='';process.stdin.on('data',x=>s+=x).on('end',()=>{try{const j=JSON.parse(s);const g=(j.children&&j.children[0])||j;const e=((g.standings||{}).entries||[])[0];console.log(' team',e&&e.team&&e.team.displayName);console.log(' stats',JSON.stringify((e&&e.stats||[]).map(x=>[x.name,x.abbreviation,x.value,x.displayValue])).slice(0,1500))}catch(x){console.log(' err',s.slice(0,200))}})"; done
