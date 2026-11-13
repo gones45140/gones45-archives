@@ -23,10 +23,13 @@ const LIGUES = [
   // 20261103k (sondes du 03/11 → « oui ») : stats joueurs rugby DISPONIBLES (essais…) ; + Champions Cup, Six Nations, NRL (rugby à XIII)
   ['rugby', '271937'], ['rugby', '180659'], ['rugby-league', '3'],
   // 20261103m (console d'Antoine : Challenge Cup ESPN = 500 par équipe dans l'appli) : + Challenge Cup, lue par l'appli comme la Champions Cup
-  ['rugby', '272073']
+  ['rugby', '272073'],
+  // 20261113k (Antoine : « rugby, l'équipe de France, Nations Championship ? » → sonde → « oui ») : SONDÉ le 13/11 (robot sonde) : 17567 Nations Championship
+  // (2026 = 36 matchs, France 6 ; France – Afrique du Sud 603999, compos 23 joueurs), 289234 tests internationaux (France 4 à 6 par an), 164205 Coupe du monde (2023 : 45)
+  ['rugby', '17567'], ['rugby', '289234'], ['rugby', '164205']
 ];
 // saisons sur l'ANNÉE CIVILE (MLB, Brésil, Argentine, sélections nationales) : dossier « 2026 » au lieu de « 2026-27 »
-const CIVIL = new Set(['180659', '3', 'mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro', 'uefa.euroq', 'conmebol.america', 'caf.nations', 'caf.nations_qual', 'fifa.worldq.conmebol', 'fifa.worldq.caf', 'fifa.worldq.afc', 'fifa.worldq.concacaf', 'fifa.worldq.ofc', 'concacaf.gold', 'concacaf.nations.league', 'afc.asian.cup']);   /* 20261113j */
+const CIVIL = new Set(['17567', '289234', '164205', '180659', '3', 'mlb', 'bra.1', 'arg.1', 'fifa.friendly', 'uefa.nations', 'fifa.worldq.uefa', 'fifa.world', 'uefa.euro', 'uefa.euroq', 'conmebol.america', 'caf.nations', 'caf.nations_qual', 'fifa.worldq.conmebol', 'fifa.worldq.caf', 'fifa.worldq.afc', 'fifa.worldq.concacaf', 'fifa.worldq.ofc', 'concacaf.gold', 'concacaf.nations.league', 'afc.asian.cup']);   /* 20261113j */
 // types propBets gardés (sondés par Antoine, 30/10) : joueurs + buts d'équipe + les deux marquent
 /* 20261103f (Antoine : « total pts équipe il propose un cut ? » → « oui ») — NBA en plus, SONDÉ le 03/11 (Jazz @ Spurs 401909917) : 98 Team Total
    Points (ligne du total d'une ÉQUIPE, rangée comme les buts d'équipe → fiche.teq), et les VRAIES lignes over / under des joueurs : 1 Total Points,
