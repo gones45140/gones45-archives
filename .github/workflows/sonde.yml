@@ -1,9 +1,0 @@
-# 20261113l — sonde temporaire (photos TheSportsDB des joueurs de rugby) ; à supprimer après usage.
-name: sonde
-on: workflow_dispatch
-jobs:
-  s:
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          for p in "Malcolm%20Marx" "Malcolm_Marx" "Antoine%20Dupont" "Theo%20Attissogbe" "Cheslin%20Kolbe" "Maxime%20Lucu"; do echo "TSDB $p"; curl -s "https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=$p" | node -e "let s='';process.stdin.on('data',x=>s+=x).on('end',()=>{try{const j=JSON.parse(s);(j.player||[]).slice(0,3).forEach(x=>console.log('  ',x.strPlayer,'|',x.strSport,'|',x.strTeam,'|thumb',!!x.strThumb,'|cut',!!x.strCutout,'|render',!!x.strRender))}catch(e){console.log('  err',s.slice(0,100))}})"; done
