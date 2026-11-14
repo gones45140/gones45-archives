@@ -261,7 +261,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   for (const [sp, lg] of [...LIGUES, ['hockey', 'khl']]) {   /* 20261106m : + KHL (archive khl.yml) */
     if (/^uefa\./.test(lg)) continue;   // coupes d'Europe : les clubs sont déjà dans leur championnat
     const st = lireJ(`miroir/${sp}/${lg}/standings.json`), noms = {};
-    let ligN = (st && (st.abbreviation || st.name)) || { '270559': 'Top 14', '271937': 'Premiership', '272073': 'URC', '3': 'NRL', khl: 'KHL' }[lg] || '';
+    let ligN = (st && (st.abbreviation || st.name)) || { '270559': 'Top 14', '271937': 'Champions Cup', '272073': 'Challenge Cup', '3': 'NRL', khl: 'KHL' }[lg]   /* 20261114g (capture « Toulon · URC », « Stade Toulousain · Premiership ») : vrais noms des 2 coupes */ || '';
     if (st) JSON.stringify(st, (k, v) => { if (v && v.team && v.team.id && v.team.displayName && !noms[v.team.id]) { const Lg = v.team.logos || []; noms[v.team.id] = [v.team.displayName, (Lg.find((x) => (x.rel || []).includes('dark')) || Lg[0] || {}).href || '']; } return v; });
     const base = `cotes/${SPN[sp]}/${lg}`;
     let sa = []; try { sa = fs.readdirSync(base).filter((x) => /^\d{4}(-\d{2})?$/.test(x)).sort(); } catch (e) {}
@@ -269,6 +269,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
     const ids = new Set([...Object.keys(eqj || {}), ...Object.keys(noms)]);
     for (const id of ids) {
       const cle = sp + '|' + lg + '|' + id; if (vusE.has(cle)) continue; vusE.add(cle);
+      if (sp === 'rugby' && (lg === '271937' || lg === '272073') && vusE.has('rugby|270559|' + id)) continue;   /* 20261114g : club du Top 14 = une seule ligne */
       const nom = (noms[id] && noms[id][0]) || (eqj && eqj[id] && eqj[id][0]) || ''; if (!nom) continue;
       IX.push([sp, lg, ligN || lg, String(id), nom, (noms[id] && noms[id][1]) || (sp === 'rugby' ? `https://a.espncdn.com/i/teamlogos/rugby/teams/500/${id}.png` : '')]);
     }
