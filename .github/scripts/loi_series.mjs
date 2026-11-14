@@ -142,6 +142,7 @@ for (const [sp, lg] of LIGUES) {
 {
   let nS = 0, pS = 0; const vus = new Set();
   for (const lg of SEL) {
+    if (lg === 'fifa.friendly') continue;   /* 20261114h (Antoine : « tout ce qui est match amical on enlève ») : pas de pépite sur un amical (séries : toujours toutes compétitions) */
     for (const j of [...new Set([jour(now), jour(fin)])]) {
       const sb = await scoreboard('soccer', lg, j); if (!sb) continue;
       const ligue = (sb.leagues && sb.leagues[0] && (sb.leagues[0].abbreviation || sb.leagues[0].name)) || lg;
