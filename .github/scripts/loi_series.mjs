@@ -163,7 +163,7 @@ for (const [sp, lg] of LIGUES) {
               const R = serie(ms, f);
               if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1) continue;
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
-              out.push({ sp: 'soccer', lg, ligue, sel: 1, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
+              out.push({ sp: 'soccer', lg, ligue, sel: 1, stg: (ev.season && ev.season.slug) || '', eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
                 d: dom ? 1 : 0, lieu, k, lib, llogo: (lgD && lgD.href) || '', logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '',
                 pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
               pS++;
@@ -237,7 +237,19 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   let neufs = 0, regles = 0;
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
-    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', c: x.c || '', r: null }); }   /* 20261107r : + couleur (fond de la carte) */
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}) }); }
+  /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
+     gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
+     UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
+  { const SBc = {};
+    for (const x of H.L) {
+      if (x.lg !== 'concacaf.nations.league' || x.stg != null) continue;
+      for (const j of [jour(x.t), jour(x.t - 864e5)]) {
+        if (!(j in SBc)) SBc[j] = await scoreboard('soccer', x.lg, j);
+        const ev = SBc[j] && (SBc[j].events || []).find((e) => String(e.id) === String(x.eid));
+        if (ev) { x.stg = (ev.season && ev.season.slug) || ''; break; }
+      }
+    } }   /* 20261107r : + couleur (fond de la carte) */
   for (const x of H.L) {
     if (x.r != null || x.t > now - 3 * 3600e3) continue;
     const f = ((PARIS[x.sp] || []).find((p) => p[0] === x.k) || [])[2]; if (!f) continue;
