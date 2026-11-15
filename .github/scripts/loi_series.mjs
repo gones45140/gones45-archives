@@ -304,7 +304,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
     const r = await fetch('https://site.api.espn.com/apis/v2/sports/soccer/uefa.nations/standings', { headers: { 'User-Agent': 'gones45-loi', Accept: 'application/json' } });
     if (r.ok) { const sj = await r.json(), GR = {};
       for (const c of sj.children || []) { const g = String(c.name || '').replace(/^Group\s*/i, ''); for (const e of ((c.standings && c.standings.entries) || [])) if (e.team && e.team.id) GR[String(e.team.id)] = g; }
-      for (const x of H.L) if (x.lg === 'uefa.nations' && x.grp == null && GR[String(x.id)]) x.grp = GR[String(x.id)];
+      for (const x of [].concat(H.L, out)) if (x.lg === 'uefa.nations' && x.grp == null && GR[String(x.id)]) x.grp = GR[String(x.id)];
       console.log('Ligue des nations : groupes ' + Object.keys(GR).length + ' équipes'); }
   } catch (e) { console.log('classement Ligue des nations illisible', e.message); }
   { const SBc = {};
@@ -328,6 +328,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   }
   H.L.sort((a, b) => b.t - a.t); H.at = now;
   fs.writeFileSync('loi/historique.json', JSON.stringify(H));
+  fs.writeFileSync('loi/loi_series.json', JSON.stringify({ at: now, n: nMatchs, s: NSAI, L: out }));   /* 20261116k : réécrit avec grp / fut / fr (règles « non compté » de la liste du jour) */
   console.log(`Historique : ${H.L.length} pépites gardées (${neufs} nouvelles, ${regles} résultats lus)`);
 }
 
