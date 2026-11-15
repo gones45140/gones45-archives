@@ -241,6 +241,16 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
+  /* 20261116c (Antoine : « pareil en Europe, Ligue des nations D on enlève, ex. Gibraltar contre Andorre ») : ESPN ne donne pas la ligue
+     dans le match (season.slug = league-phase pour tous) ; le CLASSEMENT la donne (sondé par Antoine le 16/11 : children « Group A1 … D2 »)
+     → groupe de l'équipe gardé dans grp (« D1 ») pour les pépites uefa.nations (neuves et déjà gardées). */
+  try {
+    const r = await fetch('https://site.api.espn.com/apis/v2/sports/soccer/uefa.nations/standings', { headers: { 'User-Agent': 'gones45-loi', Accept: 'application/json' } });
+    if (r.ok) { const sj = await r.json(), GR = {};
+      for (const c of sj.children || []) { const g = String(c.name || '').replace(/^Group\s*/i, ''); for (const e of ((c.standings && c.standings.entries) || [])) if (e.team && e.team.id) GR[String(e.team.id)] = g; }
+      for (const x of H.L) if (x.lg === 'uefa.nations' && x.grp == null && GR[String(x.id)]) x.grp = GR[String(x.id)];
+      console.log('Ligue des nations : groupes ' + Object.keys(GR).length + ' équipes'); }
+  } catch (e) { console.log('classement Ligue des nations illisible', e.message); }
   { const SBc = {};
     for (const x of H.L) {
       if (x.lg !== 'concacaf.nations.league' || x.stg != null) continue;
