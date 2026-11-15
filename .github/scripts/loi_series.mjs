@@ -250,6 +250,26 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
+  /* 20261116g (Antoine : « comment éviter les pièges des équipes faibles dès P1 ? » + capture espn.com/nba/futures ; sonde 16/11 :
+     core API …/seasons/2027/futures → items « NBA - Winner », futures[0].books[{ team.$ref …/teams/<id>, value « +310 » }]) :
+     cote DraftKings pour le TITRE (américaine) gardée dans fut sur chaque pépite NBA / NHL / NFL / MLB (neuves + 120 derniers jours),
+     pour filtrer ensuite les équipes que le bookmaker juge très faibles. */
+  { const FL = { nba: ['basketball', 'NBA'], nhl: ['hockey', 'NHL'], nfl: ['football', 'NFL'], mlb: ['baseball', 'MLB'] }, FUT = {};
+    for (const lg of Object.keys(FL)) {
+      const y0 = new Date(now).getUTCFullYear();
+      for (const y of [y0 + 1, y0]) {
+        try {
+          const r = await fetch(`https://sports.core.api.espn.com/v2/sports/${FL[lg][0]}/leagues/${lg}/seasons/${y}/futures?lang=en&region=us`, { headers: { 'User-Agent': 'gones45-loi', Accept: 'application/json' } });
+          if (!r.ok) continue; const j = await r.json();
+          const it = (j.items || []).find((f) => /winner|champion|super bowl|stanley cup|world series/i.test(f.name || '') && !/conference|division|league -|east|west|american|national|afc|nfc/i.test(String(f.name || '').replace(/^\w+ - /, '')));
+          const bk = it && it.futures && it.futures[0] && it.futures[0].books; if (!bk || !bk.length) continue;
+          const M = {}; for (const b of bk) { const id = (/teams\/(\d+)/.exec((b.team && b.team.$ref) || '') || [])[1]; const v = parseInt(String(b.value || '').replace('+', ''), 10); if (id && !isNaN(v)) M[id] = v; }
+          FUT[lg] = M; console.log('futures ' + lg + ' ' + y + ' (' + it.name + ') : ' + Object.keys(M).length + ' équipes'); break;
+        } catch (e) {}
+      }
+    }
+    for (const x of [].concat(H.L, out)) if (FUT[x.lg] && x.fut == null && now - x.t < 120 * 864e5 && FUT[x.lg][String(x.id)] != null) x.fut = FUT[x.lg][String(x.id)];
+  }
   /* 20261116f : montante ouverte → les matchs JOUÉS par l'équipe depuis sa dernière pépite (pas notés parce que la série était sortie des
      bornes, ex. Bucks 14/11) sont ajoutés (sv: 1), dans l'ordre, jusqu'au 1er pari gagné ; le règlement plus bas les juge comme les autres. */
   { let nSv = 0; const der = {};
