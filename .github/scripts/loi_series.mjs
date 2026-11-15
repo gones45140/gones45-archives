@@ -246,7 +246,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   let neufs = 0, regles = 0;
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
-    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}) }); }
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
