@@ -103,6 +103,15 @@ function serie(ms0, f) {
 }
 
 const now = Date.now(), fin = now + H24, out = [];
+/* 20261116f (captures Bucks : 11/11 ❌, 12/11 ❌, puis rejoué le 14 et encore perdu — plus de pépite : la série (8) a dépassé PIRE_MAX)
+   → une MONTANTE OUVERTE (dernier résultat gardé de la même équipe + même pari = ❌, depuis moins de 45 jours) est SUIVIE jusqu'à la
+   victoire, même si la série sort des bornes (record battu, écart avec la pire série) ; x.sv = 1 (suivi de montante). */
+const OUV = new Set();
+{ const H0 = (() => { try { return JSON.parse(fs.readFileSync('loi/historique.json', 'utf8')); } catch (e) { return { L: [] }; } })(), der = {};
+  for (const x of H0.L || []) { if (x.r !== 0 && x.r !== 1) continue; const c = x.id + '|' + x.k; if (!der[c] || x.t > der[c].t) der[c] = x; }
+  for (const c in der) if (der[c].r === 0 && now - der[c].t < 45 * 864e5) OUV.add(c);
+  console.log('montantes ouvertes suivies : ' + OUV.size); }
+const garde = (R, id, k) => R.n >= MIN_N && R.cours >= 1 && (OUV.has(String(id) + '|' + k) || !(R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1));
 let nMatchs = 0;
 for (const [sp, lg] of LIGUES) {
   const vus = new Set();
@@ -126,7 +135,7 @@ for (const [sp, lg] of LIGUES) {
           for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
             const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
             const R = serie(ms, f);
-            if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1) continue;
+            if (!garde(R, id, k)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
             const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;   // même chiffre en 🏠 et partout : une seule ligne
             out.push({ sp, lg, ligue, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
               d: dom ? 1 : 0, lieu, k, lib,
@@ -161,7 +170,7 @@ for (const [sp, lg] of LIGUES) {
             for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
               const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
               const R = serie(ms, f);
-              if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1) continue;
+              if (!garde(R, id, k)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
               out.push({ sp: 'soccer', lg, ligue, sel: 1, stg: (ev.season && ev.season.slug) || '', eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
                 d: dom ? 1 : 0, lieu, k, lib, llogo: (lgD && lgD.href) || '', logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '',
@@ -208,7 +217,7 @@ for (const [sp, lg] of LIGUES) {
             for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
               const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
               const R = serie(ms, f);
-              if (R.n < MIN_N || R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1) continue;
+              if (!garde(R, co.id, k)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
               out.push({ sp: 'hockey', lg: 'khl', ligue: 'KHL', eid: 'khl' + e.id, t, id: String(co.id), eq: E.nom || co.name || '', adv: adv.name || '', d: dom ? 1 : 0, lieu, k, lib,
                 llogo: '', logo: co.image || '', c: '', alogo: adv.image || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined,
@@ -241,6 +250,26 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
+  /* 20261116f : montante ouverte → les matchs JOUÉS par l'équipe depuis sa dernière pépite (pas notés parce que la série était sortie des
+     bornes, ex. Bucks 14/11) sont ajoutés (sv: 1), dans l'ordre, jusqu'au 1er pari gagné ; le règlement plus bas les juge comme les autres. */
+  { let nSv = 0; const der = {};
+    for (const x of H.L) { if (x.r !== 0 && x.r !== 1) continue; const c = x.id + '|' + x.k; if (!der[c] || x.t > der[c].t) der[c] = x; }
+    for (const c in der) {
+      const x0 = der[c]; if (x0.r !== 0 || now - x0.t > 45 * 864e5) continue;
+      const f = ((PARIS[x0.sp] || []).find((p) => p[0] === x0.k) || [])[2]; if (!f) continue;
+      const base = `cotes/${SPN[x0.sp]}/${x0.lg}`; let sa = []; try { sa = fs.readdirSync(base).filter((q) => /^\d{4}(-\d{2})?$/.test(q)).sort().slice(-2); } catch (e) {}
+      const M = []; for (const s0 of sa) { const q = lireJ(`${base}/${s0}/equipes/${x0.id}.json`); for (const m of ((q && q.m) || [])) if (m && m[0] > x0.t + 3 * 3600e3 && m[0] < now - 3 * 3600e3 && m[4] && m[4][0] != null && m[4][1] != null && (!US.has(x0.sp) || m[5] === 2)) M.push(m); }
+      M.sort((a, b) => a[0] - b[0]); let nIci = 0;
+      for (const m of M) {
+        const eid = (String(x0.eid).indexOf('khl') === 0 ? 'khl' : '') + m[2], dom = m[3] === 'h';
+        if (vus.has([eid, x0.id, x0.k, x0.lieu].join('|'))) break;
+        vus.add([eid, x0.id, x0.k, x0.lieu].join('|'));
+        H.L.push({ j: jourP(m[0]), t: m[0], sp: x0.sp, lg: x0.lg, ligue: x0.ligue, eid, id: x0.id, eq: x0.eq, adv: '', d: dom ? 1 : 0, lieu: x0.lieu, k: x0.k, lib: x0.lib, pire: Math.max(x0.pire, x0.cours + nIci + 1), cours: x0.cours + nIci + 1, logo: x0.logo || '', c: x0.c || '', r: null, sv: 1 });
+        nSv++; nIci++;
+        const p = dom ? +m[4][0] : +m[4][1], cc = dom ? +m[4][1] : +m[4][0]; if (f(p, cc, m[6] ? 1 : 0)) break;
+      }
+    }
+    console.log('montantes : ' + nSv + ' match(s) suivi(s) ajouté(s)'); }
   /* 20261116c (Antoine : « pareil en Europe, Ligue des nations D on enlève, ex. Gibraltar contre Andorre ») : ESPN ne donne pas la ligue
      dans le match (season.slug = league-phase pour tous) ; le CLASSEMENT la donne (sondé par Antoine le 16/11 : children « Group A1 … D2 »)
      → groupe de l'équipe gardé dans grp (« D1 ») pour les pépites uefa.nations (neuves et déjà gardées). */
