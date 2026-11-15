@@ -262,9 +262,9 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
       M.sort((a, b) => a[0] - b[0]); let nIci = 0;
       for (const m of M) {
         const eid = (String(x0.eid).indexOf('khl') === 0 ? 'khl' : '') + m[2], dom = m[3] === 'h';
-        if (vus.has([eid, x0.id, x0.k, x0.lieu].join('|'))) break;
-        vus.add([eid, x0.id, x0.k, x0.lieu].join('|'));
-        H.L.push({ j: jourP(m[0]), t: m[0], sp: x0.sp, lg: x0.lg, ligue: x0.ligue, eid, id: x0.id, eq: x0.eq, adv: '', d: dom ? 1 : 0, lieu: x0.lieu, k: x0.k, lib: x0.lib, pire: Math.max(x0.pire, x0.cours + nIci + 1), cours: x0.cours + nIci + 1, logo: x0.logo || '', c: x0.c || '', r: null, sv: 1 });
+        if (vus.has([eid, x0.id, x0.k, x0.lieu].join('|')) || vus.has([eid, x0.id, x0.k, 'tout'].join('|'))) break;
+        vus.add([eid, x0.id, x0.k, 'tout'].join('|'));   /* lieu « tout » : la montante suit TOUS les matchs (🏠 et ✈️) → 🌍 */
+        H.L.push({ j: jourP(m[0]), t: m[0], sp: x0.sp, lg: x0.lg, ligue: x0.ligue, eid, id: x0.id, eq: x0.eq, adv: '', d: dom ? 1 : 0, lieu: 'tout', k: x0.k, lib: x0.lib, pire: Math.max(x0.pire, x0.cours + nIci + 1), cours: x0.cours + nIci + 1, logo: x0.logo || '', c: x0.c || '', r: null, sv: 1 });
         nSv++; nIci++;
         const p = dom ? +m[4][0] : +m[4][1], cc = dom ? +m[4][1] : +m[4][0]; if (f(p, cc, m[6] ? 1 : 0)) break;
       }
