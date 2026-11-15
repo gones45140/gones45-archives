@@ -261,7 +261,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
         try {
           const r = await fetch(`https://sports.core.api.espn.com/v2/sports/${FL[lg][0]}/leagues/${lg}/seasons/${y}/futures?lang=en&region=us`, { headers: { 'User-Agent': 'gones45-loi', Accept: 'application/json' } });
           if (!r.ok) continue; const j = await r.json();
-          const it = (j.items || []).find((f) => /winner|champion|super bowl|stanley cup|world series/i.test(f.name || '') && !/conference|division|league -|east|west|american|national|afc|nfc/i.test(String(f.name || '').replace(/^\w+ - /, '')));
+          const it = (j.items || []).find((f) => /winner|champion|super bowl|stanley cup|world series/i.test(f.name || '') && !/trophy|mvp|award|rookie|player|coach|leader|cy young|heisman/i.test(f.name || '') && !/conference|division|league -|east|west|american|national|afc|nfc/i.test(String(f.name || '').replace(/^\w+\s*- /, '')));   /* 20261116g : NHL avait pris « Hart Trophy Winner » */
           const bk = it && it.futures && it.futures[0] && it.futures[0].books; if (!bk || !bk.length) continue;
           const M = {}; for (const b of bk) { const id = (/teams\/(\d+)/.exec((b.team && b.team.$ref) || '') || [])[1]; const v = parseInt(String(b.value || '').replace('+', ''), 10); if (id && !isNaN(v)) M[id] = v; }
           FUT[lg] = M; console.log('futures ' + lg + ' ' + y + ' (' + it.name + ') : ' + Object.keys(M).length + ' équipes'); break;
