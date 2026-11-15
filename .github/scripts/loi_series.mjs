@@ -268,7 +268,14 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
         } catch (e) {}
       }
     }
-    for (const x of [].concat(H.L, out)) if (FUT[x.lg] && x.fut == null && now - x.t < 120 * 864e5 && FUT[x.lg][String(x.id)] != null) x.fut = FUT[x.lg][String(x.id)];
+    /* 20261116h (Antoine : « les 6 dernières, que l'on ne joue pas, on est d'accord ») : rang depuis la PLUS MAUVAISE cote titre (fr = 1 → la
+       moins cotée de la ligue), relu chaque matin → s'ajuste tout seul en cours de saison ; l'appli ne compte pas fr ≤ 6. */
+    const RG = {}; for (const lg in FUT) { const ids = Object.keys(FUT[lg]).sort((a, b) => FUT[lg][b] - FUT[lg][a]); RG[lg] = {}; ids.forEach((id, i) => { RG[lg][id] = i + 1; }); }
+    for (const x of [].concat(H.L, out)) {
+      if (!FUT[x.lg] || now - x.t > 120 * 864e5 || FUT[x.lg][String(x.id)] == null) continue;
+      if (x.fut == null) x.fut = FUT[x.lg][String(x.id)];
+      if (x.fr == null && (x.r == null || now - x.t < 2 * 864e5)) x.fr = RG[x.lg][String(x.id)];   /* rang du jour du match (pas réécrit ensuite) */
+    }
   }
   /* 20261116f : montante ouverte → les matchs JOUÉS par l'équipe depuis sa dernière pépite (pas notés parce que la série était sortie des
      bornes, ex. Bucks 14/11) sont ajoutés (sv: 1), dans l'ordre, jusqu'au 1er pari gagné ; le règlement plus bas les juge comme les autres. */
