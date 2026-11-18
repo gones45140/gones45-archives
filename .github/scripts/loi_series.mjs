@@ -170,8 +170,29 @@ const PJ = {
     sc: (s) => nb(s.G) + ' but' + (nb(s.G) > 1 ? 's' : '') + ' · ' + nb(s.A) + ' passe' + (nb(s.A) > 1 ? 's' : '') },
   football: { lgs: ['nfl'], rs: true, ph: 'nfl', joue: (s) => s.J == null || +s.J >= 1,
     paris: [['jt', 'Touchdown', (s) => nb(s.rTD) + nb(s.reTD) >= 1]],
-    sc: (s) => (nb(s.rTD) + nb(s.reTD)) + ' TD' }
+    sc: (s) => (nb(s.rTD) + nb(s.reTD)) + ' TD' },
+  /* 20261118l (« moyenne de 22,5 → mettre 2 lignes 20+ et 25+ 🤔 ») : NBA = paliers du book (Milestones DraftKings 218 / 220 / 219), pour chaque
+     joueur le palier JUSTE EN DESSOUS et JUSTE AU-DESSUS de sa moyenne (82 derniers matchs joués). Clé jn<STAT><seuil>, ex. jnPTS20. */
+  basketball: { lgs: ['nba'], rs: true, ph: 'nba', joue: (s) => s.J == null || +s.J >= 1, paris: [],
+    nba: { PTS: [[10, 15, 20, 25, 30, 35, 40], 'points'], REB: [[4, 6, 8, 10, 12, 14], 'rebonds'], AST: [[3, 5, 7, 9, 11], 'passes'] },
+    sc: (s) => nb(s.PTS) + ' pts · ' + nb(s.REB) + ' reb · ' + nb(s.AST) + ' pas.' }
 };
+/* paris d'un joueur (NBA : selon sa moyenne) et pari d'une clé (règlement) */
+function parisDe(sp, E) {
+  const C = PJ[sp]; if (!C.nba) return C.paris;
+  const R = E.L.slice(-82), o = [];
+  for (const [st, [TH, lib]] of Object.entries(C.nba)) {
+    const moy = R.reduce((a, m) => a + nb(m.s[st]), 0) / (R.length || 1);
+    const bas = TH.filter((x) => x <= moy).pop(), haut = TH.find((x) => x > moy);
+    for (const th of [bas, haut]) if (th != null) o.push(['jn' + st + th, th + '+ ' + lib, (s) => nb(s[st]) >= th]);
+  }
+  return o;
+}
+function pariCle(sp, k) {
+  const C = PJ[sp]; if (!C) return null; const m = String(k).match(/^jn([A-Z]+)(\d+)$/);
+  if (m) { const st = m[1], th = +m[2]; return (s) => nb(s[st]) >= th; }
+  return ((C.paris.find((p) => p[0] === k)) || [])[2] || null;
+}
 const PARISJ = Object.fromEntries(Object.entries(PJ).map(([k, v]) => [k, v.paris]));
 const RSJ = {};   /* saison → Set des n° de match de saison régulière (sports US) */
 function rsSaison(dirSa) {
@@ -206,7 +227,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
           const tid = co.team && String(co.team.id); if (!tid) continue; const adv = cs.find((x) => x !== co), dom = co.homeAway === 'home';
           for (const pid of Object.keys(JJ)) { const P = JJ[pid]; if (!P || String(P[1]) !== tid) continue;
             const E = matchsJoueur(sp, pid); if (!E || E.L.length < MIN_N) continue; C.j++;
-            for (const [k, lib, f] of PJ[sp].paris) { const vu = {};
+            for (const [k, lib, f] of parisDe(sp, E)) { const vu = {};
               for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
                 const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom), R = serieJ(ms, f);
                 if (ms.length < MIN_N || !garde(R, 'j' + pid, k)) continue;
@@ -395,7 +416,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   /* 20261118h / k : règlement des pépites JOUEURS : ligne du joueur pour ce n° de match ; match joué par l'équipe mais pas par lui → -1 (n'a pas joué) */
   for (const x of H.L) {
     if (!x.jo || x.r != null || x.t > now - 3 * 3600e3) continue;
-    const C = PJ[x.sp], f = (((C && C.paris) || []).find((p) => p[0] === x.k) || [])[2]; if (!f) continue;
+    const C = PJ[x.sp], f = pariCle(x.sp, x.k); if (!f) continue;
     const base = `cotes/${SPN[x.sp]}/${x.lg}`, sa = saisonsDe(base).slice(-2);
     let lj = null, joueEq = false;
     for (const s0 of sa) { const q = lireJ(`${base}/${s0}/joueurs/${x.jid}.json`); const y = q && (q.m || []).find((z) => String(z[2]) === String(x.eid)); if (y) lj = y;
