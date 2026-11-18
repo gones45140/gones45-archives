@@ -209,6 +209,23 @@ function matchsJoueur(sp, pid) {
         const sa = s0.length === 4 ? s0 + '-' : s0; saU.add(sa); L.push({ t: m[0], sa, d: m[6] === 'h', s: m[4], eid: String(m[2]) }); } } }
   L.sort((a, b) => a.t - b.t); return { nom, L, sa: [...saU].sort().slice(-NSAI) };
 }
+/* 20261118n (capture : pépite Marcus Smart 10+ points alors qu'il est « Suspendu » → « c'est comptabilisé les suspensions et blessures ? ») :
+   absents annoncés par ESPN (résumé du match, injuries[].injuries[] {athlete.id, status « Out » / « Day-To-Day », type.abbreviation O / DD / Q…,
+   details.type}) ; secours = copie du miroir (miroir/<sp>/<lg>/resumes/<eid>.json, ±2 h du match). Joueur « Out » (blessé, malade, suspendu)
+   → pas de pépite. Les séries, elles, ne comptent déjà que les matchs joués. */
+const ABSC = {}; let nAbs = 0;
+async function absentsDe(sp, lg, eid) {
+  if (ABSC[eid]) return ABSC[eid]; let inj = null;
+  for (const h of ['https://site.web.api.espn.com', 'https://site.api.espn.com']) {
+    try { const r = await fetch(`${h}/apis/site/v2/sports/${sp}/${lg}/summary?event=${eid}`, { headers: { 'User-Agent': 'gones45-loi', Accept: 'application/json' } }); if (r.ok) { inj = (await r.json()).injuries; break; } } catch (e) {}
+  }
+  if (!inj) inj = (lireJ(`miroir/${sp}/${lg}/resumes/${eid}.json`) || {}).injuries;
+  const S = new Set();
+  for (const T of inj || []) for (const i of T.injuries || []) { const a = i.athlete || {}; if (!a.id) continue;
+    const st = String(i.status || ''), ab = String((i.type && i.type.abbreviation) || ''), dt = String((i.details && i.details.type) || '');
+    if (/^out$/i.test(st) || ab === 'O' || /susp/i.test(st + ' ' + dt)) S.add(String(a.id)); }
+  return (ABSC[eid] = S);
+}
 function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d, p: m, c: 0 })), (m) => f(m.s)); }
 { const cpt = {};
   for (const sp of Object.keys(PJ)) for (const lg of PJ[sp].lgs) {
@@ -225,7 +242,9 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
         const cs = (ev.competitions && ev.competitions[0] && ev.competitions[0].competitors) || [];
         for (const co of cs) {
           const tid = co.team && String(co.team.id); if (!tid) continue; const adv = cs.find((x) => x !== co), dom = co.homeAway === 'home';
+          const ABS = await absentsDe(sp, lg, String(ev.id));   /* 20261118n */
           for (const pid of Object.keys(JJ)) { const P = JJ[pid]; if (!P || String(P[1]) !== tid) continue;
+            if (ABS.has(String(pid))) { nAbs++; continue; }
             const E = matchsJoueur(sp, pid); if (!E || E.L.length < MIN_N) continue; C.j++;
             for (const [k, lib, f] of parisDe(sp, E)) { const vu = {};
               for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
@@ -242,6 +261,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
               } } } } } }
   }
   for (const sp of Object.keys(cpt)) console.log(`👤 joueurs ${sp} : ${cpt[sp].j} joueurs lus, ${cpt[sp].p} pépites`);
+  console.log(`👤 joueurs annoncés absents (Out / suspendus) écartés : ${nAbs}`);
 }
 /* 20261113h : pépites des sélections (matchs des 24 h de chaque compétition, séries sur toutes les compétitions) */
 {
