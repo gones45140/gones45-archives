@@ -113,7 +113,7 @@ const OUV = new Set();
   for (const x of H0.L || []) { if (x.r !== 0 && x.r !== 1) continue; const c = x.id + '|' + x.k; if (!der[c] || x.t > der[c].t) der[c] = x; }
   for (const c in der) if (der[c].r === 0 && now - der[c].t < 45 * 864e5) OUV.add(c);
   console.log('montantes ouvertes suivies : ' + OUV.size); }
-const garde = (R, id, k) => R.n >= MIN_N && R.cours >= 1 && (OUV.has(String(id) + '|' + k) || !(R.pire < PIRE_MIN || R.pire > PIRE_MAX || R.cours < COURS_MIN || R.pire - R.cours > 1));
+const garde = (R, id, k) => R.n >= MIN_N && R.cours >= 1 && (OUV.has(String(id) + '|' + k) || !(R.pire < PIRE_MIN || (R.pa || R.pire) > PIRE_MAX /* 20261118f : record des séries TERMINÉES (une série en cours de 8 avec un record de 5 reste suivie) */ || R.cours < COURS_MIN || R.pire - R.cours > 1));
 let nMatchs = 0;
 for (const [sp, lg] of LIGUES) {
   const vus = new Set();
