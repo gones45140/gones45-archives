@@ -235,7 +235,7 @@ function assezDeSaisons(sp, E, saCour) {
   const cur = saCour.length === 4 ? saCour + '-' : saCour; if (!n[cur]) return false;
   return Object.keys(n).filter((k) => k !== cur && n[k] >= SAI_ENT[sp]).length >= 2;
 }
-let nSai = 0;
+let nSai = 0, nNba = 0;
 function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d, p: m, c: 0 })), (m) => f(m.s)); }
 { const cpt = {};
   for (const sp of Object.keys(PJ)) for (const lg of PJ[sp].lgs) {
@@ -264,6 +264,11 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
                 /* 20261118h : anti-bruit joueurs (Dries buteur 31 ratés en cours, 13 % de réussite = un joueur qui ne marque pas, pas une série) :
                    réussite ≥ 30 % des matchs joués ET série en cours ≤ record passé + 3 */
                 if (R.ok / R.n < 0.30 || R.cours > (R.pa || 0) + 3) continue;
+                /* 20261118q (Antoine, joueurs NBA : « pire série sur 5 ans 6 maximum, mais 5 sur les deux dernières années complètes ; s'il y a du 7
+                   parmi les saisons complètes on enlève ; on parle pas de la saison en cours ») : pire série de CHAQUE saison terminée ≤ 6, et ≤ 5
+                   pour les 2 dernières saisons terminées ; saison en cours ignorée. */
+                if (sp === 'basketball') { const cur = sa[sa.length - 1], fin = E.sa.filter((k) => k !== cur && R.parS[k]);
+                  if (fin.some((k) => R.parS[k].pire > 6) || fin.slice(-2).some((k) => R.parS[k].pire > 5)) { nNba++; continue; } }
                 const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1; C.p++;
                 out.push({ sp, lg, ligue, eid: String(ev.id), t, id: 'j' + pid, jo: 1, jid: String(pid), tid, eq: E.nom || P[0], equipe: (co.team && (co.team.displayName || '')) || '',
                   adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '', d: dom ? 1 : 0, lieu, k, lib, llogo,
@@ -272,7 +277,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
               } } } } } }
   }
   for (const sp of Object.keys(cpt)) console.log(`👤 joueurs ${sp} : ${cpt[sp].j} joueurs lus, ${cpt[sp].p} pépites`);
-  console.log(`👤 joueurs annoncés absents (Out / suspendus) écartés : ${nAbs} ; moins de 2 saisons entières + saison en cours : ${nSai}`);
+  console.log(`👤 joueurs annoncés absents (Out / suspendus) écartés : ${nAbs} ; moins de 2 saisons entières + saison en cours : ${nSai} ; NBA saisons terminées > 6 (ou > 5 sur les 2 dernières) : ${nNba}`);
 }
 /* 20261113h : pépites des sélections (matchs des 24 h de chaque compétition, séries sur toutes les compétitions) */
 {
