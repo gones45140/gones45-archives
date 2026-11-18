@@ -90,16 +90,18 @@ function matchsSel(id) {
    seulement (qualifications sautées) ; qv = date de la dernière réussite EN QUALIFICATION pendant la série en cours (mention ⚠️ sur la carte). */
 function serie(ms0, f) {
   const ms = ms0.filter((m) => !m.q);
-  let pire = 0, cur = 0, ok = 0, qv = 0; const parS = {};
+  let pire = 0, cur = 0, ok = 0, qv = 0, pa = 0; const parS = {};   /* 20261118e : pa = pire série TERMINÉE (sans la série en cours) */
   const dern = ms.length ? ms[ms.length - 1].t : 0; let debut = 0;
   for (const m of ms) {
     const r = f(m.p, m.c, m.ot);
-    if (r) { ok++; cur = 0; } else { cur++; if (cur > pire) pire = cur; }
+    if (r) { ok++; if (cur > pa) pa = cur; cur = 0; } else { cur++; if (cur > pire) pire = cur; }
     const P = parS[m.sa] || (parS[m.sa] = { cur: 0, pire: 0 });
     if (r) P.cur = 0; else { P.cur++; if (P.cur > P.pire) P.pire = P.cur; }
   }
   if (cur) { debut = ms[ms.length - cur].t; for (const m of ms0) if (m.q && m.t > debut && f(m.p, m.c, m.ot)) qv = m.t; }
-  return { n: ms.length, ok, pire, cours: cur, parS, qv };
+  /* 20261118e (Antoine : « une équipe qui a une série actuellement de 7 mais qui sur les 5 dernières saisons avait 5, on la garde… c'est un peu le
+     but ») : le filtre « pire série 5 / 6 max » de l'appli lit pa (record des séries terminées) et non pire (qui inclut la série en cours). */
+  return { n: ms.length, ok, pire, pa, cours: cur, parS, qv };
 }
 
 const now = Date.now(), fin = now + H24, out = [];
@@ -140,7 +142,7 @@ for (const [sp, lg] of LIGUES) {
             out.push({ sp, lg, ligue, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
               d: dom ? 1 : 0, lieu, k, lib,
               /* 20261105v (« on habille la carte ») : logo + couleur de l'équipe, logo de l'adversaire (fournis par le calendrier ESPN) */
-              llogo, logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
+              llogo, logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '', pire: R.pire, pa: R.pa, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
           }
         }
       }
@@ -174,7 +176,7 @@ for (const [sp, lg] of LIGUES) {
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
               out.push({ sp: 'soccer', lg, ligue, sel: 1, stg: (ev.season && ev.season.slug) || '', eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
                 d: dom ? 1 : 0, lieu, k, lib, llogo: (lgD && lgD.href) || '', logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '',
-                pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
+                pire: R.pire, pa: R.pa, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
               pS++;
             }
           }
@@ -220,7 +222,7 @@ for (const [sp, lg] of LIGUES) {
               if (!garde(R, co.id, k)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
               out.push({ sp: 'hockey', lg: 'khl', ligue: 'KHL', eid: 'khl' + e.id, t, id: String(co.id), eq: E.nom || co.name || '', adv: adv.name || '', d: dom ? 1 : 0, lieu, k, lib,
-                llogo: '', logo: co.image || '', c: '', alogo: adv.image || '', pire: R.pire, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined,
+                llogo: '', logo: co.image || '', c: '', alogo: adv.image || '', pire: R.pire, pa: R.pa, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined,
                 p: E.sa.slice().reverse().map((s) => (R.parS[s] ? R.parS[s].pire : null)).filter((x) => x != null) });
               pK++;
             }
@@ -246,7 +248,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   let neufs = 0, regles = 0;
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
-    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
@@ -291,7 +293,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
         const eid = (String(x0.eid).indexOf('khl') === 0 ? 'khl' : '') + m[2], dom = m[3] === 'h';
         if (vus.has([eid, x0.id, x0.k, x0.lieu].join('|')) || vus.has([eid, x0.id, x0.k, 'tout'].join('|'))) break;
         vus.add([eid, x0.id, x0.k, 'tout'].join('|'));   /* lieu « tout » : la montante suit TOUS les matchs (🏠 et ✈️) → 🌍 */
-        H.L.push({ j: jourP(m[0]), t: m[0], sp: x0.sp, lg: x0.lg, ligue: x0.ligue, eid, id: x0.id, eq: x0.eq, adv: '', d: dom ? 1 : 0, lieu: 'tout', k: x0.k, lib: x0.lib, pire: Math.max(x0.pire, x0.cours + nIci + 1), cours: x0.cours + nIci + 1, logo: x0.logo || '', c: x0.c || '', r: null, sv: 1 });
+        H.L.push({ j: jourP(m[0]), t: m[0], sp: x0.sp, lg: x0.lg, ligue: x0.ligue, eid, id: x0.id, eq: x0.eq, adv: '', d: dom ? 1 : 0, lieu: 'tout', k: x0.k, lib: x0.lib, pire: Math.max(x0.pire, x0.cours + nIci + 1), ...(x0.pa != null ? { pa: x0.pa } : {}), cours: x0.cours + nIci + 1, logo: x0.logo || '', c: x0.c || '', r: null, sv: 1 });
         nSv++; nIci++;
         const p = dom ? +m[4][0] : +m[4][1], cc = dom ? +m[4][1] : +m[4][0]; if (f(p, cc, m[6] ? 1 : 0)) break;
       }
