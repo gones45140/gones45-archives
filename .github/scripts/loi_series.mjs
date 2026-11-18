@@ -149,6 +149,60 @@ for (const [sp, lg] of LIGUES) {
     }
   }
 }
+/* ═══ 20261118h — 👤 PÉPITES JOUEURS NHL (Antoine : « et les joueurs 🤔 » → B tous les joueurs, filtrés par les règles : « buteur 5 ratés de suite
+   alors qu'il marque 2 buts par saison ? → sa pire série serait supérieure à 5, donc éliminé directement » ; « et décisif NHL » = pointeur ; « oui go ») :
+   pour chaque match NHL des 24 h, joueurs de chaque équipe (joueurs.json de la saison en cours, p[1] = équipe), feuilles des 5 saisons
+   (cotes/hockey/nhl/<saison>/joueurs/<id>.json, m = [t, mois, n° match, équipe, {G, A…}, cote, h|a]), SAISON RÉGULIÈRE seule (n° de match présent
+   en m[5] === 2 dans les fiches équipes) et matchs JOUÉS seulement. Paris : jp ⭐ Pointeur / décisif (but ou passe), jb 🥅 Buteur, ja 🎯 Passeur.
+   Mêmes bornes que les équipes (garde). Pépite : id « j<idEspn> » (séries à part des équipes), jo: 1, jid, tid (équipe → cote titre / fr). ═══ */
+const PARISJ = { hockey: [['jp', 'Pointeur / décisif', (g, a) => g + a >= 1], ['jb', 'Buteur', (g) => g >= 1], ['ja', 'Passeur', (g, a) => a >= 1]] };
+const RSJ = {};   /* saison → Set des n° de match de saison régulière */
+function rsSaison(dirSa) {
+  if (RSJ[dirSa]) return RSJ[dirSa]; const S = new Set(); let fs0 = []; try { fs0 = fs.readdirSync(dirSa + '/equipes'); } catch (e) {}
+  for (const f of fs0) { const q = lireJ(dirSa + '/equipes/' + f); for (const m of ((q && q.m) || [])) if (m && m[5] === 2) S.add(String(m[2])); }
+  return (RSJ[dirSa] = S);
+}
+function matchsJoueur(sp, lg, pid) {
+  const base = `cotes/${SPN[sp]}/${lg}`; let sa = []; try { sa = fs.readdirSync(base).filter((x) => /^\d{4}(-\d{2})?$/.test(x)).sort().slice(-NSAI); } catch (e) { return null; }
+  const L = []; let nom = '';
+  for (const s0 of sa) { const q = lireJ(`${base}/${s0}/joueurs/${pid}.json`); if (!q || !q.m) continue; nom = q.n || nom; const RS = rsSaison(`${base}/${s0}`);
+    for (const m of q.m) { if (!m || !m[4] || !RS.has(String(m[2]))) continue; if (m[4].J != null && +m[4].J < 1) continue;
+      L.push({ t: m[0], sa: s0, d: m[6] === 'h', p: +m[4].G || 0, c: +m[4].A || 0, eid: String(m[2]) }); } }
+  L.sort((a, b) => a.t - b.t); return { nom, L, sa };
+}
+{ let nJ = 0, pJ = 0;
+  for (const [sp, lg] of [['hockey', 'nhl']]) {
+    const base = `cotes/${SPN[sp]}/${lg}`; let sa = []; try { sa = fs.readdirSync(base).filter((x) => /^\d{4}(-\d{2})?$/.test(x)).sort(); } catch (e) {}
+    const JJ = sa.length ? (lireJ(`${base}/${sa[sa.length - 1]}/joueurs.json`) || {}) : {};
+    const vus = new Set();
+    for (const j of [...new Set([jour(now), jour(fin)])]) {
+      const sb = await scoreboard(sp, lg, j); if (!sb) continue;
+      const ligue = (sb.leagues && sb.leagues[0] && (sb.leagues[0].abbreviation || sb.leagues[0].name)) || lg;
+      const LG = ((sb.leagues && sb.leagues[0] && sb.leagues[0].logos) || []), lgD = LG.find((x) => (x.rel || []).includes('dark')) || LG[0], llogo = (lgD && lgD.href) || '';
+      for (const ev of sb.events || []) {
+        const t = Date.parse(ev.date); if (!(t > now && t <= fin) || vus.has(ev.id)) continue;
+        const st = ev.status && ev.status.type && ev.status.type.state; if (st && st !== 'pre') continue; vus.add(ev.id);
+        const cs = (ev.competitions && ev.competitions[0] && ev.competitions[0].competitors) || [];
+        for (const co of cs) {
+          const tid = co.team && String(co.team.id); if (!tid) continue; const adv = cs.find((x) => x !== co), dom = co.homeAway === 'home';
+          for (const pid of Object.keys(JJ)) { const P = JJ[pid]; if (!P || String(P[1]) !== tid) continue;
+            const E = matchsJoueur(sp, lg, pid); if (!E || E.L.length < MIN_N) continue; nJ++;
+            for (const [k, lib, f] of PARISJ[sp]) { const vu = {};
+              for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
+                const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom), R = serie(ms, f);
+                if (!garde(R, 'j' + pid, k)) continue;
+                /* 20261118h : anti-bruit joueurs (Dries buteur 31 ratés en cours, 13 % de réussite = un joueur qui ne marque pas, pas une série) :
+                   réussite ≥ 30 % des matchs joués ET série en cours ≤ record passé + 3 */
+                if (R.ok / R.n < 0.30 || R.cours > (R.pa || 0) + 3) continue;
+                const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1; pJ++;
+                out.push({ sp, lg, ligue, eid: String(ev.id), t, id: 'j' + pid, jo: 1, jid: String(pid), tid, eq: E.nom || P[0], equipe: (co.team && (co.team.displayName || '')) || '',
+                  adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '', d: dom ? 1 : 0, lieu, k, lib, llogo,
+                  logo: `https://a.espncdn.com/i/headshots/nhl/players/full/${pid}.png`, c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '',
+                  pire: R.pire, pa: R.pa, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s0) => (R.parS[s0] ? R.parS[s0].pire : null)).filter((x) => x != null) });
+              } } } } } }
+  }
+  console.log(`👤 joueurs NHL : ${nJ} joueurs lus, ${pJ} pépites`);
+}
 /* 20261113h : pépites des sélections (matchs des 24 h de chaque compétition, séries sur toutes les compétitions) */
 {
   let nS = 0, pS = 0; const vus = new Set();
@@ -248,7 +302,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   let neufs = 0, regles = 0;
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
-    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, ...(x.jo ? { jo: 1, jid: x.jid, tid: x.tid, equipe: x.equipe } : {}), pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
@@ -274,9 +328,10 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
        moins cotée de la ligue), relu chaque matin → s'ajuste tout seul en cours de saison ; l'appli ne compte pas fr ≤ 6. */
     const RG = {}; for (const lg in FUT) { const ids = Object.keys(FUT[lg]).sort((a, b) => FUT[lg][b] - FUT[lg][a]); RG[lg] = {}; ids.forEach((id, i) => { RG[lg][id] = i + 1; }); }
     for (const x of [].concat(H.L, out)) {
-      if (!FUT[x.lg] || now - x.t > 120 * 864e5 || FUT[x.lg][String(x.id)] == null) continue;
-      if (x.fut == null) x.fut = FUT[x.lg][String(x.id)];
-      if (x.fr == null && (x.r == null || now - x.t < 2 * 864e5)) x.fr = RG[x.lg][String(x.id)];   /* rang du jour du match (pas réécrit ensuite) */
+      const xid = String(x.jo ? x.tid : x.id);   /* 20261118h : joueur → cote titre de son équipe */
+      if (!FUT[x.lg] || now - x.t > 120 * 864e5 || FUT[x.lg][xid] == null) continue;
+      if (x.fut == null) x.fut = FUT[x.lg][xid];
+      if (x.fr == null && (x.r == null || now - x.t < 2 * 864e5)) x.fr = RG[x.lg][xid];   /* rang du jour du match (pas réécrit ensuite) */
     }
   }
   /* 20261116f : montante ouverte → les matchs JOUÉS par l'équipe depuis sa dernière pépite (pas notés parce que la série était sortie des
@@ -318,6 +373,17 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
         if (ev) { x.stg = (ev.season && ev.season.slug) || ''; break; }
       }
     } }   /* 20261107r : + couleur (fond de la carte) */
+  /* 20261118h : règlement des pépites JOUEURS : ligne du joueur pour ce n° de match (G / A) ; match joué par l'équipe mais pas par lui → -1 (n'a pas joué) */
+  for (const x of H.L) {
+    if (!x.jo || x.r != null || x.t > now - 3 * 3600e3) continue;
+    const f = (((PARISJ[x.sp] || []).find((p) => p[0] === x.k)) || [])[2]; if (!f) continue;
+    const base = `cotes/${SPN[x.sp]}/${x.lg}`; let sa = []; try { sa = fs.readdirSync(base).filter((q) => /^\d{4}(-\d{2})?$/.test(q)).sort().slice(-2); } catch (e) {}
+    let lj = null, joueEq = false;
+    for (const s0 of sa) { const q = lireJ(`${base}/${s0}/joueurs/${x.jid}.json`); const y = q && (q.m || []).find((z) => String(z[2]) === String(x.eid)); if (y) lj = y;
+      const qe = lireJ(`${base}/${s0}/equipes/${x.tid}.json`); if (qe && (qe.m || []).some((z) => String(z[2]) === String(x.eid) && z[4] && z[4][0] != null)) joueEq = true; }
+    if (lj && lj[4] && (lj[4].J == null || +lj[4].J >= 1)) { const g = +lj[4].G || 0, a = +lj[4].A || 0; x.r = f(g, a) ? 1 : 0; x.sc = g + ' but' + (g > 1 ? 's' : '') + ' · ' + a + ' passe' + (a > 1 ? 's' : ''); regles++; }
+    else if (joueEq || x.t < now - 10 * 864e5) { x.r = -1; x.sc = 'n\'a pas joué'; regles++; }
+  }
   for (const x of H.L) {
     if (x.r != null || x.t > now - 3 * 3600e3) continue;
     const f = ((PARIS[x.sp] || []).find((p) => p[0] === x.k) || [])[2]; if (!f) continue;
