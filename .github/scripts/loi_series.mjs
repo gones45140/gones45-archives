@@ -380,6 +380,9 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   /* 20261118r (bilan ➕ : « voir entre parenthèses les chiffres comme la carte du jour ») : pire série PAR SAISON (x.p) gardée aussi dans
      l'historique ; pépites déjà gardées (même eid / id / pari / lieu) complétées depuis la liste du jour. */
   { const P = new Map(out.filter((x) => x.p && x.p.length).map((x) => [cle(x), x.p])); for (const h of H.L) if (!h.p && P.has(cle(h))) h.p = P.get(cle(h)); }
+  /* 20261118s (bilan : Alef Manga / Viveros / Kris Murray gardés le matin, AVANT les filtres joueurs 2 saisons / NBA / absents) : pépite JOUEUR
+     pas encore jouée qui n'est plus dans la liste du jour → retirée de l'historique (les équipes ne changent pas). */
+  { const OK = new Set(out.map(cle)), n0 = H.L.length; H.L = H.L.filter((h) => { const ko = h.jo && h.r == null && h.t > now && !OK.has(cle(h)); if (ko) vus.delete(cle(h)); return !ko; }); if (H.L.length < n0) console.log(`👤 pépites joueurs retirées de l'historique (plus dans la liste) : ${n0 - H.L.length}`); }
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
     H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, ...(x.jo ? { jo: 1, jid: x.jid, tid: x.tid, equipe: x.equipe } : {}), ...(x.p && x.p.length ? { p: x.p } : {}), pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
