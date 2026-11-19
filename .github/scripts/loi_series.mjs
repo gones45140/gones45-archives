@@ -263,19 +263,22 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
           for (const pid of Object.keys(JJ)) { const P = JJ[pid]; if (!P || String(P[1]) !== tid) continue;
             if (ABS.has(String(pid))) { nAbs++; continue; }
             const E = matchsJoueur(sp, pid); if (!E || E.L.length < MIN_N) continue; C.j++;
-            if (!assezDeSaisons(sp, E, sa[sa.length - 1])) { nSai++; continue; }   /* 20261118o */
-            if (!titulaire(sp, E)) { nTit++; continue; }   /* 20261119b */
+            /* 20261119e (« une équipe qui joue une série pariée déjà en cours, on la garde ? » → « oui go ») : montante ouverte → aucun filtre de retrait */
+            const moJ = PJ[sp].paris.some((p) => OUV.has('j' + pid + '|' + p[0])) || [...OUV].some((c) => c.startsWith('j' + pid + '|'));
+            if (!moJ && !assezDeSaisons(sp, E, sa[sa.length - 1])) { nSai++; continue; }   /* 20261118o */
+            if (!moJ && !titulaire(sp, E)) { nTit++; continue; }   /* 20261119b */
             for (const [k, lib, f] of parisDe(sp, E)) { const vu = {};
               for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
                 const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom), R = serieJ(ms, f);
                 if (ms.length < MIN_N || !garde(R, 'j' + pid, k)) continue;
                 /* 20261118h : anti-bruit joueurs (Dries buteur 31 ratés en cours, 13 % de réussite = un joueur qui ne marque pas, pas une série) :
                    réussite ≥ 30 % des matchs joués ET série en cours ≤ record passé + 3 */
-                if (R.ok / R.n < 0.30 || R.cours > (R.pa || 0) + 3) continue;
+                const moK = OUV.has('j' + pid + '|' + k);   /* 20261119e */
+                if (!moK && (R.ok / R.n < 0.30 || R.cours > (R.pa || 0) + 3)) continue;
                 /* 20261118q (Antoine, joueurs NBA : « pire série sur 5 ans 6 maximum, mais 5 sur les deux dernières années complètes ; s'il y a du 7
                    parmi les saisons complètes on enlève ; on parle pas de la saison en cours ») : pire série de CHAQUE saison terminée ≤ 6, et ≤ 5
                    pour les 2 dernières saisons terminées ; saison en cours ignorée. */
-                if (sp === 'basketball') { const cur = sa[sa.length - 1], fin = E.sa.filter((k) => k !== cur && R.parS[k]);
+                if (sp === 'basketball' && !moK) { const cur = sa[sa.length - 1], fin = E.sa.filter((k) => k !== cur && R.parS[k]);
                   if (fin.some((k) => R.parS[k].pire > 6) || fin.slice(-2).some((k) => R.parS[k].pire > 5)) { nNba++; continue; } }
                 const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1; C.p++;
                 out.push({ sp, lg, ligue, eid: String(ev.id), t, id: 'j' + pid, jo: 1, jid: String(pid), tid, eq: E.nom || P[0], equipe: (co.team && (co.team.displayName || '')) || '',
@@ -382,6 +385,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
    le résultat est relu dans les archives (equipes/<id>.json de la saison, m[2] = n° du match, m[4] = score, m[6] = prolongation) :
    r = 1 → le pari a gagné (la série s'est arrêtée), 0 → encore raté ; sc = « pour-contre ». Pas trouvé 10 jours après → r = -1 (annulé / reporté). ═══ */
 {
+  for (const x of out) if (OUV.has(String(x.id) + '|' + x.k)) x.mo = 1;   /* 20261119e : pépite d'une montante déjà ouverte (P2 et +) */
   const H = lireJ('loi/historique.json') || { L: [] }, cle = (x) => [x.eid, x.id, x.k, x.lieu].join('|'), vus = new Set(H.L.map(cle));
   const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   let neufs = 0, regles = 0;
@@ -392,7 +396,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
      pas encore jouée qui n'est plus dans la liste du jour → retirée de l'historique (les équipes ne changent pas). */
   { const OK = new Set(out.map(cle)), n0 = H.L.length; H.L = H.L.filter((h) => { const ko = h.jo && h.r == null && h.t > now && !OK.has(cle(h)); if (ko) vus.delete(cle(h)); return !ko; }); if (H.L.length < n0) console.log(`👤 pépites joueurs retirées de l'historique (plus dans la liste) : ${n0 - H.L.length}`); }
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
-    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, ...(x.jo ? { jo: 1, jid: x.jid, tid: x.tid, equipe: x.equipe } : {}), ...(x.p && x.p.length ? { p: x.p } : {}), pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, ...(x.jo ? { jo: 1, jid: x.jid, tid: x.tid, equipe: x.equipe } : {}), ...(x.p && x.p.length ? { p: x.p } : {}), ...(x.mo ? { mo: 1 } : {}), pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
