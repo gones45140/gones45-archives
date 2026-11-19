@@ -7,6 +7,8 @@
 import fs from 'node:fs';
 const IX = JSON.parse(fs.readFileSync('loi/equipes.json', 'utf8')).L || [];
 const F = 'bannieres/bannieres.json';
+// 19/11 : 1er passage planté (ENOENT à la 40e sauvegarde) → dossier créé dès le départ.
+fs.mkdirSync('bannieres', { recursive: true });
 let B = { v: 1, t: 0, E: {} }; try { B = JSON.parse(fs.readFileSync(F, 'utf8')); B.E = B.E || {}; } catch (e) {}
 const SPT = { soccer: 'Soccer', hockey: 'Ice Hockey', basketball: 'Basketball', football: 'American Football', baseball: 'Baseball', rugby: 'Rugby', 'rugby-league': 'Rugby' };
 const nz = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
