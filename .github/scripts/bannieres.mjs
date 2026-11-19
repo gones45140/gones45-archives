@@ -15,6 +15,9 @@ const nz = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ
 const dors = (ms) => new Promise((r) => setTimeout(r, ms));
 const MARQ = /(gloriosas|femenin|feminin|women|ladies|damen|dames|girls|youth|academy|reserve|reserves|\bu\s?1[4-9]\b|\bu\s?2[0-3]\b|\bii\b|\bb\b)/i;
 const variantes = (n) => { const v = [n], c = n.replace(/\b(FC|CF|AFC|AC|SC|AS|CD|CA|SV|FK|SK|BK|Club|de Fútbol|Futebol Clube)\b\.?/gi, '').replace(/\s+/g, ' ').trim(); if (c && c !== n) v.push(c); return v; };
+// 19/11 : 2e passage = 257 clubs, 0 réponse → la clé « 3 » est COUPÉE par TheSportsDB depuis le 23/10 (403, cf. app.js 20261023u) :
+// clé gratuite « 123 ». DERN garde le dernier statut d'erreur ; 10 clubs de suite sans AUCUNE réponse → arrêt (plus 80 min dans le vide).
+let DERN = 0, SANS = 0;
 async function chercher(nom, sp) {
   const ess = variantes(nom), acc = new Set(ess.map(nz).filter(Boolean)), att = SPT[sp] || '';
   const corr = (k) => k && (acc.has(k) || [...acc].some((a) => a.length >= 6 && (k.includes(a) || a.includes(k))));
@@ -22,8 +25,8 @@ async function chercher(nom, sp) {
   for (const e of ess) {
     let j = null;
     for (let tent = 0; tent < 3 && !j; tent++) {
-      try { const r = await fetch('https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=' + encodeURIComponent(e));
-        if (r.status === 429) { await dors(65000); continue; } if (!r.ok) { await dors(5000); continue; } j = await r.json(); } catch (x) { await dors(5000); }
+      try { const r = await fetch('https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=' + encodeURIComponent(e));
+        if (r.status === 429) { await dors(65000); continue; } if (!r.ok) { DERN = r.status; await dors(5000); continue; } j = await r.json(); } catch (x) { await dors(5000); }
     }
     await dors(2300);   // ≈ 26 recherches / minute (clé gratuite)
     if (!j) continue; rep = true;
@@ -41,6 +44,7 @@ for (const x of liste) {
   const E = B.E[k]; if (E && ((E.u && now - E.t < 60 * J) || (!E.u && now - E.t < 14 * J))) continue;
   if (Date.now() - depart > 80 * 60e3) { console.log('⏱️ temps écoulé, la suite au prochain passage'); break; }
   const r = await chercher(x[4], x[0]); faits++;
+  if (r.rep) SANS = 0; else if (++SANS >= 10) { console.log('❌ TheSportsDB ne répond plus (dernier statut ' + DERN + '), arrêt'); break; }
   if (r.u || r.rep) { B.E[k] = { n: x[4], u: r.u, t: now }; if (r.u) trouves++; }
   if (faits % 40 === 0) { B.t = Date.now(); fs.writeFileSync(F, JSON.stringify(B)); console.log(faits + ' cherchées, ' + trouves + ' trouvées'); }
 }
