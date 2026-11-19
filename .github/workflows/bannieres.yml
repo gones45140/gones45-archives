@@ -1,0 +1,37 @@
+# GONES45 — 🖼️ Archive des bannières d'équipes (20261120i). Adresses des images TheSportsDB pour chaque club de loi/equipes.json,
+# lues par l'appli (cartes du Cockpit, joueurs sans carte du club). Voir .github/scripts/bannieres.mjs.
+name: bannieres
+on:
+  schedule:
+    - cron: '17 3 * * 1'   # chaque lundi ≈ 4 h 17 à Paris (l'hiver)
+  workflow_dispatch:
+concurrency:
+  group: bannieres
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  bannieres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Bannières
+        run: node .github/scripts/bannieres.mjs
+      - name: Enregistrement
+        if: always()
+        run: |
+          git config user.name "Bannières"
+          git config user.email "actions@users.noreply.github.com"
+          git add bannieres
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Bannières $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          exit 1
