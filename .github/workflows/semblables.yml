@@ -1,0 +1,36 @@
+# GONES45 — 📚 Matchs semblables NHL / NBA / NFL (20261120x) : cotes « vainqueur » de clôture + total + score des 5 dernières saisons,
+# lus par le panneau « Ton pari » (ligne 📚 DraftKings + archives). Voir .github/scripts/semblables.mjs.
+name: semblables
+on:
+  schedule:
+    - cron: '43 6 * * *'   # chaque matin ≈ 7 h 43 à Paris (l'hiver), après les robots de cotes de la nuit
+  workflow_dispatch:
+concurrency:
+  group: semblables
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  semblables:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Matchs semblables
+        run: node .github/scripts/semblables.mjs
+      - name: Enregistrement
+        run: |
+          git config user.name "Semblables"
+          git config user.email "actions@users.noreply.github.com"
+          git add loi/semblables
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Matchs semblables $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          exit 1
