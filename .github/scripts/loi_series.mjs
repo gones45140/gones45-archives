@@ -235,7 +235,14 @@ function assezDeSaisons(sp, E, saCour) {
   const cur = saCour.length === 4 ? saCour + '-' : saCour; if (!n[cur]) return false;
   return Object.keys(n).filter((k) => k !== cur && n[k] >= SAI_ENT[sp]).length >= 2;
 }
-let nSai = 0, nNba = 0;
+let nSai = 0, nNba = 0, nTit = 0;
+/* 20261119b (capture Carrington 10+ points, remplaçant : « faudrait accepter que les joueurs titulaires ») : rôle sur les 10 DERNIERS matchs joués
+   — NBA : 25 min de moyenne au moins (ESPN ne garde pas « titulaire » en basket ; Harden ≈ 31, Carrington ≈ 17) ;
+   foot : titulaire (TIT) dans 7 des 10 ; NHL / NFL : pas de filtre (pas de titulaire / remplaçant dans les feuilles). */
+function titulaire(sp, E) { const R = E.L.slice(-10); if (!R.length) return false;
+  if (sp === 'basketball') return R.reduce((a, m) => a + nb(m.s.MIN), 0) / R.length >= 25;
+  if (sp === 'soccer') return R.filter((m) => m.s.TIT).length >= Math.min(7, R.length);
+  return true; }
 function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d, p: m, c: 0 })), (m) => f(m.s)); }
 { const cpt = {};
   for (const sp of Object.keys(PJ)) for (const lg of PJ[sp].lgs) {
@@ -257,6 +264,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
             if (ABS.has(String(pid))) { nAbs++; continue; }
             const E = matchsJoueur(sp, pid); if (!E || E.L.length < MIN_N) continue; C.j++;
             if (!assezDeSaisons(sp, E, sa[sa.length - 1])) { nSai++; continue; }   /* 20261118o */
+            if (!titulaire(sp, E)) { nTit++; continue; }   /* 20261119b */
             for (const [k, lib, f] of parisDe(sp, E)) { const vu = {};
               for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
                 const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom), R = serieJ(ms, f);
@@ -277,7 +285,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
               } } } } } }
   }
   for (const sp of Object.keys(cpt)) console.log(`👤 joueurs ${sp} : ${cpt[sp].j} joueurs lus, ${cpt[sp].p} pépites`);
-  console.log(`👤 joueurs annoncés absents (Out / suspendus) écartés : ${nAbs} ; moins de 2 saisons entières + saison en cours : ${nSai} ; NBA saisons terminées > 6 (ou > 5 sur les 2 dernières) : ${nNba}`);
+  console.log(`👤 joueurs annoncés absents (Out / suspendus) écartés : ${nAbs} ; moins de 2 saisons entières + saison en cours : ${nSai} ; NBA saisons terminées > 6 (ou > 5 sur les 2 dernières) : ${nNba} ; pas titulaires : ${nTit}`);
 }
 /* 20261113h : pépites des sélections (matchs des 24 h de chaque compétition, séries sur toutes les compétitions) */
 {
