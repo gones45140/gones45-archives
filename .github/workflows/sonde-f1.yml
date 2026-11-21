@@ -11,8 +11,10 @@ jobs:
           node -e "
           (async()=>{
             const j=await (await fetch('https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard?dates=2026')).json();
-            const E=(j.events||[]).filter(e=>Date.parse(e.endDate||e.date)>Date.now()-3*864e5).slice(0,2);
-            for(const e of E){ console.log('ESPN', e.id, e.name, e.date, e.endDate, '| circuit', JSON.stringify(e.circuit&&{id:e.circuit.id,fullName:e.circuit.fullName}));
-              for(const c of (e.competitions||[])) console.log('   ', JSON.stringify({id:c.id,ty:c.type,date:c.date,st:c.status&&c.status.type&&c.status.type.name})); }
-            for (const u of ['sessions?year=2026&meeting_key=latest','meetings?year=2025']) { const r=await fetch('https://api.openf1.org/v1/'+u); const t=await r.text(); console.log('OPENF1',u,r.status,t.slice(0,900)); }
+            const ab={};
+            for(const e of (j.events||[])){ const l=(e.competitions||[]).map(c=>(c.type||{}).abbreviation).join(','); ab[l]=(ab[l]||[]).concat(e.name.slice(0,25)); }
+            console.log('ABBR', JSON.stringify(ab));
+            for(const e of (j.events||[])) console.log('EV', e.id, e.date.slice(0,10), JSON.stringify(e.circuit&&{id:e.circuit.id,n:e.circuit.fullName,c:e.circuit.address&&e.circuit.address.country}));
+            const sp=(j.events||[]).find(e=>(e.competitions||[]).length>5)||{}; for(const c of (sp.competitions||[])) console.log('SPRINT', JSON.stringify({ty:c.type,date:c.date}));
+            for (const u of ['sessions?session_key=latest','sessions?year=2025&session_name=Qualifying']) { const r=await fetch('https://api.openf1.org/v1/'+u); const t=await r.text(); console.log('OPENF1',u,r.status,t.slice(0,1500)); }
           })()"
