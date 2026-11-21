@@ -1,0 +1,8 @@
+# SONDE TEMPORAIRE (21/11) : photos ESPN des joueurs de foot. À supprimer après lecture.
+name: sonde-ph
+on: workflow_dispatch
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - run: for i in 253989 231388 155193 999999999; do curl -s -o /dev/null -w "$i %{http_code} %{content_type} %{size_download}\n" https://a.espncdn.com/i/headshots/soccer/players/full/$i.png; done

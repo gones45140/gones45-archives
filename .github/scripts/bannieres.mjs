@@ -14,7 +14,23 @@ const SPT = { soccer: 'Soccer', hockey: 'Ice Hockey', basketball: 'Basketball', 
 const nz = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '');
 const dors = (ms) => new Promise((r) => setTimeout(r, ms));
 const MARQ = /(gloriosas|femenin|feminin|women|ladies|damen|dames|girls|youth|academy|reserve|reserves|\bu\s?1[4-9]\b|\bu\s?2[0-3]\b|\bii\b|\bb\b)/i;
-const variantes = (n) => { const v = [n], c = n.replace(/\b(FC|CF|AFC|AC|SC|AS|CD|CA|SV|FK|SK|BK|Club|de Fútbol|Futebol Clube)\b\.?/gi, '').replace(/\s+/g, ' ').trim(); if (c && c !== n) v.push(c); return v; };
+// 21/11 (capture d'Antoine : Inter et Lille sans bannière sur le mur) : 64 clubs « pas trouvés » car le nom ESPN n'est pas celui de
+// TheSportsDB (Internazionale = Inter Milan, Lille = 5 lettres < 6 donc pas de recherche « contenu »…) → autres noms essayés en plus,
+// et ces clubs sont recherchés de nouveau tout de suite (sans attendre 14 j).
+const ALIAS = { 'Internazionale': ['Inter Milan', 'Inter'], 'Lille': ['Lille OSC', 'LOSC Lille', 'Lille LOSC'], 'Paris Saint-Germain': ['Paris SG', 'PSG'],
+  'Stade Rennais': ['Rennes', 'Stade Rennais FC'], 'Saint-Étienne': ['Saint-Etienne', 'St Etienne', 'AS Saint-Etienne'], 'Athletic Club': ['Athletic Bilbao'],
+  'Alavés': ['Alaves', 'Deportivo Alaves'], 'Brighton & Hove Albion': ['Brighton', 'Brighton and Hove Albion'], 'Nottingham Forest': ['Nottingham Forest FC', "Nott'm Forest"],
+  'FC Cologne': ['FC Koln', '1. FC Köln', 'Koln'], 'Racing Santander': ['Racing de Santander'], 'Atlético-MG': ['Atletico Mineiro', 'Atlético Mineiro'],
+  'Gimnasia La Plata': ['Gimnasia y Esgrima La Plata', 'Gimnasia LP'], 'Sochaux': ['FC Sochaux', 'Sochaux-Montbeliard'], 'FC Famalicao': ['Famalicao'],
+  'C.D. Nacional': ['Nacional', 'CD Nacional'], 'Casa Pia': ['Casa Pia AC'], 'Santa Clara': ['CD Santa Clara'], 'Red Star FC 93': ['Red Star FC', 'Red Star'],
+  'LA Clippers': ['Los Angeles Clippers'], 'St. Louis Cardinals': ['St Louis Cardinals'], 'CSKA': ['CSKA Moscow'], 'SKA': ['SKA Saint Petersburg', 'SKA St Petersburg'],
+  'Dynamo Msk': ['Dynamo Moscow'], 'Dinamo Mn': ['Dinamo Minsk'], 'Metallurg Mg': ['Metallurg Magnitogorsk'], 'Sibir': ['Sibir Novosibirsk'],
+  'Amur': ['Amur Khabarovsk'], 'Barys': ['Barys Astana', 'Barys Nur-Sultan'], 'Lada': ['Lada Togliatti'],
+  'Racing 92': ['Racing Metro 92', 'Racing 92 Paris'], 'La Rochelle': ['Stade Rochelais'], 'Clermont Auvergne': ['ASM Clermont Auvergne', 'Clermont'],
+  'Bordeaux Begles': ['Union Bordeaux-Begles', 'Bordeaux-Begles'], 'Bayonne': ['Aviron Bayonnais'], 'Pau': ['Section Paloise'], 'Perpignan': ['USA Perpignan'],
+  'Lyon': ['Lyon OU', 'LOU Rugby'], 'Bristol Rugby': ['Bristol Bears'], 'Cardiff Blues': ['Cardiff Rugby', 'Cardiff'], 'Newcastle Falcons': ['Newcastle Red Bulls'] };
+const ALIAS_V = 1;
+const variantes = (n) => { const v = [n].concat(ALIAS[n] || []), c = n.replace(/\b(FC|CF|AFC|AC|SC|AS|CD|CA|SV|FK|SK|BK|Club|de Fútbol|Futebol Clube)\b\.?/gi, '').replace(/\s+/g, ' ').trim(); if (c && c !== n) v.push(c); return v; };
 // 19/11 : 2e passage = 257 clubs, 0 réponse → la clé « 3 » est COUPÉE par TheSportsDB depuis le 23/10 (403, cf. app.js 20261023u) :
 // clé gratuite « 123 ». DERN garde le dernier statut d'erreur ; 10 clubs de suite sans AUCUNE réponse → arrêt (plus 80 min dans le vide).
 let DERN = 0, SANS = 0;
@@ -41,11 +57,11 @@ const liste = IX.filter((x) => x && x[3] && x[4] && x[1] !== 'sel' && x[1] !== '
 const vus = new Set();
 for (const x of liste) {
   const k = x[0] + '|' + x[3]; if (vus.has(k)) continue; vus.add(k);
-  const E = B.E[k]; if (E && ((E.u && now - E.t < 60 * J) || (!E.u && now - E.t < 14 * J))) continue;
+  const E = B.E[k]; if (E && ((E.u && now - E.t < 60 * J) || (!E.u && now - E.t < 14 * J && !(ALIAS[x[4]] && E.a !== ALIAS_V)))) continue;
   if (Date.now() - depart > 80 * 60e3) { console.log('⏱️ temps écoulé, la suite au prochain passage'); break; }
   const r = await chercher(x[4], x[0]); faits++;
   if (r.rep) SANS = 0; else if (++SANS >= 10) { console.log('❌ TheSportsDB ne répond plus (dernier statut ' + DERN + '), arrêt'); break; }
-  if (r.u || r.rep) { B.E[k] = { n: x[4], u: r.u, t: now }; if (r.u) trouves++; }
+  if (r.u || r.rep) { B.E[k] = { n: x[4], u: r.u, t: now }; if (ALIAS[x[4]]) B.E[k].a = ALIAS_V; if (r.u) trouves++; }
   if (faits % 40 === 0) { B.t = Date.now(); fs.writeFileSync(F, JSON.stringify(B)); console.log(faits + ' cherchées, ' + trouves + ' trouvées'); }
 }
 B.t = Date.now(); fs.mkdirSync('bannieres', { recursive: true }); fs.writeFileSync(F, JSON.stringify(B));
