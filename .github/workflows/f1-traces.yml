@@ -1,0 +1,36 @@
+# GONES45 — 🏎 Tracés des circuits F1 fabriqués à l'avance (21/11/2026), pour que la carte en direct marche même si personne
+# n'a ouvert la fiche du GP entre deux séances (OpenF1 = 401 pendant une séance). Voir .github/scripts/f1_traces.mjs.
+name: f1-traces
+on:
+  schedule:
+    - cron: '17 11 * * *'   # chaque jour ≈ 12 h 17 à Paris (l'hiver) ; si une séance est en cours, il réessaie le lendemain
+  workflow_dispatch:
+concurrency:
+  group: f1-traces
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  traces:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Tracés F1
+        run: node .github/scripts/f1_traces.mjs
+      - name: Enregistrement
+        run: |
+          git config user.name "Traces F1"
+          git config user.email "actions@users.noreply.github.com"
+          git add f1/traces
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Tracés F1 $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          exit 1
