@@ -1,9 +1,0 @@
-# SONDE TEMPORAIRE (21/11) : photo TheSportsDB de Haaland. À supprimer après lecture.
-name: sonde-ph
-on: workflow_dispatch
-jobs:
-  s:
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          for n in "Erling%20Haaland" "Haaland" "Erling_Haaland"; do curl -s "https://www.thesportsdb.com/api/v1/json/123/searchplayers.php?p=$n" | python3 -c "import json,sys;d=json.load(sys.stdin);print('$n',[(p.get('idPlayer'),p.get('strPlayer'),p.get('strTeam'),p.get('strSport'),p.get('strCutout'),p.get('strThumb'),p.get('strRender')) for p in (d.get('player') or [])][:4])"; sleep 3; done
