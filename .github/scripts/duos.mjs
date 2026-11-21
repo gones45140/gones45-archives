@@ -15,6 +15,8 @@ const joue = (C, v) => v && v.s && (C.foot ? v.s.TIT : v.s.J);
 const reussi = (k, sa, sb) => { if (k === 'b') return (sa.G || 0) + (sb.G || 0) > 0; const L = +k.slice(1); return k[0] === 'm' ? Math.max(sa.PTS || 0, sb.PTS || 0) > L : (sa.PTS || 0) + (sb.PTS || 0) > L; };
 const stat = (L) => { let ok = 0, pire = 0, c = 0; for (const z of L) { if (z) { ok++; c = 0; } else { c++; if (c > pire) pire = c; } } return [L.length, ok, pire, c]; };
 fs.mkdirSync('loi/duos', { recursive: true });
+/* 20261122b (capture : Lightning sans logo, le nom court « Lightning » n'était pas dans l'index) : nom COMPLET + logo par n° d'équipe ESPN (loi/equipes.json) */
+const IXE = {}; try { for (const x of JSON.parse(fs.readFileSync('loi/equipes.json', 'utf8')).L || []) IXE[x[1] + '|' + x[3]] = [x[4], x[5] || '']; } catch (e) {}
 for (const C of CONF) {
   if (!fs.existsSync(C.d)) continue;
   const sais = fs.readdirSync(C.d).filter((d) => /^\d{4}-\d{2}$/.test(d)).sort().slice(-2), cur = sais[sais.length - 1], G = [];
@@ -45,7 +47,8 @@ for (const C of CONF) {
     });
     if (!bon) continue;
     const [a, b] = k.split('|'), last = L[L.length - 1];
-    R.push([noms[a], a, noms[b], b, last[3], last[4], o]);
+    const lgK = C.f === 'nhl' ? 'nhl' : C.f === 'nba' ? 'nba' : C.f.slice(5), eq = IXE[lgK + '|' + last[4]] || [last[3], ''];
+    R.push([noms[a], a, noms[b], b, eq[0], last[4], o, eq[1]]);
   }
   const k0 = C.K[C.f === 'nba' ? 1 : 0];
   R.sort((x, y) => y[6][k0][1] / y[6][k0][0] - x[6][k0][1] / x[6][k0][0]);
