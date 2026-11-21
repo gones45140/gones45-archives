@@ -21,11 +21,13 @@ jobs:
           node-version: '22'
       - name: Matchs semblables
         run: node .github/scripts/semblables.mjs
+      - name: Duos double chance buteur NHL (20261121q)
+        run: node .github/scripts/duos.mjs
       - name: Enregistrement
         run: |
           git config user.name "Semblables"
           git config user.email "actions@users.noreply.github.com"
-          git add loi/semblables
+          git add loi/semblables loi/duos
           if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
           git commit -m "Matchs semblables $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
           for i in 1 2 3 4 5; do
