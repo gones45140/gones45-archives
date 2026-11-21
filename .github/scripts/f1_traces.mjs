@@ -45,6 +45,7 @@ async function tracer(sessions) {
     .sort((a, b) => rang(b) - rang(a) || Date.parse(b.date_start) - Date.parse(a.date_start));
   for (const s of finies.slice(0, 3)) {
     const k = s.session_key;
+    try {   /* 21/11 : 1er passage, « openf1 404 laps?session_key=11265 » (séance sans données) → séance suivante au lieu de tout arrêter */
     const L = (await of1('laps?session_key=' + k)).filter((l) => l.lap_duration && l.date_start && !l.is_pit_out_lap && l.duration_sector_1 && l.duration_sector_2 && l.duration_sector_3)
       .sort((a, b) => a.lap_duration - b.lap_duration)[0];
     if (!L) continue;
@@ -57,14 +58,17 @@ async function tracer(sessions) {
     try {
       const Pi = (await of1('pit?session_key=' + k)).filter((x) => x.date).sort((a, b) => (b.lane_duration || 0) - (a.lane_duration || 0));
       for (let q = 0; q < Math.min(3, Pi.length) && !tr.pit; q++) {
-        const pd = new Date(Pi[q].date), du = +(Pi[q].lane_duration || 30);
+        /* 21/11 : Interlagos → voie de 9 807 points (lane_duration énorme, drapeau rouge ?) refusée par le worker (413) : durée bornée 60 s, voie ≤ 600 points */
+        const pd = new Date(Pi[q].date), du = Math.min(60, +(Pi[q].lane_duration || 30));
         const Lp = await of1('location?session_key=' + k + '&driver_number=' + Pi[q].driver_number + '&date>' + new Date(+pd - 15000).toISOString() + '&date<' + new Date(+pd + (du + 15) * 1000).toISOString());
         tr.pit = pitVoie(tr, Lp || []);
+        if (tr.pit && tr.pit.length > 600) tr.pit = null;
       }
     } catch (e) { if (e instanceof Bloque) throw e; }
     if (!tr.pit) delete tr.pit;
     tr.k = k;
     return { tr, s };
+    } catch (e) { if (e instanceof Bloque) throw e; console.log('   séance', k, 'ignorée :', e.message); }
   }
   return null;
 }
@@ -84,13 +88,18 @@ async function tracer(sessions) {
       const re = CIRC[id];
       if (!re) { console.log('⚠️ circuit inconnu', id, circuits[id]); continue; }
       let res = null;
+      try {
       for (const y of [an, an - 1]) {
-        const S = (await sesAn(y)).filter((s) => re.test(s.circuit_short_name || '') || re.test(s.location || ''));
+        let S = (await sesAn(y)).filter((s) => re.test(s.circuit_short_name || '') || re.test(s.location || ''));
+        /* 21/11 : Bahreïn pris sur les essais d'hiver (« Day 3 ») → seulement les week-ends de GP (avec qualifs ou course) */
+        const gp = new Set(S.filter((s) => /qualifying|race/i.test(s.session_name || '')).map((s) => s.meeting_key));
+        if (gp.size) S = S.filter((s) => gp.has(s.meeting_key));
         if (!S.length) continue;
         const dern = Math.max(...S.map((s) => s.meeting_key));   /* dernier week-end sur ce circuit */
         res = await tracer(S.filter((s) => s.meeting_key === dern));
         if (res) break;
       }
+      } catch (e) { if (e instanceof Bloque) throw e; console.log('— erreur', id, e.message); }
       if (!res) { console.log('— pas de tracé', id, circuits[id]); continue; }
       fs.writeFileSync(fic, JSON.stringify(res.tr));
       let dep = '';
