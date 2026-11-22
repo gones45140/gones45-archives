@@ -82,3 +82,20 @@ for (const C of CONF) {
   fs.writeFileSync('loi/duos/' + C.f + '.json', JSON.stringify({ v: 2, t: Date.now(), s: sais, s4: sais4, K: C.K, L: OUT }));
   console.log('✅ ' + C.f + ' : ' + G.length + ' matchs · ' + R.length + ' duos (' + OUT.length + ' écrits) · saisons ' + sais.join(', '));
 }
+
+/* 20261122m (« oui oui » : cote estimée « par les buts » ; tests 5 343 matchs des 5 grands championnats → bat la moyenne équipe + adversaire,
+   victoire d'un favori 72 % annoncé / 71 % réel au lieu de 60 %) : moyenne de buts DOMICILE / EXTÉRIEUR de chaque championnat de foot sur ses
+   5 dernières saisons (hors playoffs) → loi/buts_ligues.json { v: 1, t, L: { 'esp.1': [buts dom, buts ext, matchs] } }, lu par « Ton pari ». */
+{
+  const BL = {}, base = 'cotes/foot/';
+  for (const lg of fs.existsSync(base) ? fs.readdirSync(base) : []) {
+    const d0 = base + lg + '/'; if (!fs.statSync(base + lg).isDirectory()) continue;
+    const sais = fs.readdirSync(d0).filter((d) => /^\d{4}(-\d{2})?$/.test(d)).sort().slice(-5); let h = 0, a = 0, n = 0;
+    for (const s of sais) { const dir = d0 + s + '/matchs/'; if (!fs.existsSync(dir)) continue;
+      for (const f of fs.readdirSync(dir)) { let J; try { J = JSON.parse(fs.readFileSync(dir + f, 'utf8')); } catch (e) { continue; }
+        for (const x of Object.values(J)) if (x && x.f && x.f.h != null && x.ty !== 3) { h += +x.f.h; a += +x.f.a; n++; } } }
+    if (n >= 100) BL[lg] = [Math.round(h / n * 1000) / 1000, Math.round(a / n * 1000) / 1000, n];
+  }
+  fs.writeFileSync('loi/buts_ligues.json', JSON.stringify({ v: 1, t: Date.now(), L: BL }));
+  console.log('✅ buts_ligues : ' + Object.keys(BL).length + ' championnats');
+}
