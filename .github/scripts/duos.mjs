@@ -19,8 +19,9 @@ fs.mkdirSync('loi/duos', { recursive: true });
 const IXE = {}; try { for (const x of JSON.parse(fs.readFileSync('loi/equipes.json', 'utf8')).L || []) IXE[x[1] + '|' + x[3]] = [x[4], x[5] || '']; } catch (e) {}
 for (const C of CONF) {
   if (!fs.existsSync(C.d)) continue;
-  const sais = fs.readdirSync(C.d).filter((d) => /^\d{4}-\d{2}$/.test(d)).sort().slice(-2), cur = sais[sais.length - 1], G = [];
-  for (const s of sais) { const dir = C.d + s + '/matchs/'; if (!fs.existsSync(dir)) continue;
+  /* 20261122c (« 2 saisons est-ce suffisant ? » → bouton 4 saisons « oui ») : on lit les 4 dernières saisons ; classement et seuils sur les 2 dernières, stats 4 saisons en plus (d[8]) */
+  const sais4 = fs.readdirSync(C.d).filter((d) => /^\d{4}-\d{2}$/.test(d)).sort().slice(-4), sais = sais4.slice(-2), cur = sais[sais.length - 1], G = [];
+  for (const s of sais4) { const dir = C.d + s + '/matchs/'; if (!fs.existsSync(dir)) continue;
     for (const f of fs.readdirSync(dir).sort()) { let J; try { J = JSON.parse(fs.readFileSync(dir + f, 'utf8')); } catch (e) { continue; }
       for (const x of Object.values(J)) if (x && x.st && x.f && x.ty !== 3) G.push([x.t, s, x]); } }
   G.sort((a, b) => a[0] - b[0]);
@@ -30,11 +31,12 @@ for (const C of CONF) {
     for (let i = 0; i < pl.length; i++) for (let j = i + 1; j < pl.length; j++) {
       const [a, va] = pl[i], [b, vb] = pl[j], k = a + '|' + b; noms[a] = va.n; noms[b] = vb.n;
       if (!P.has(k)) P.set(k, []);
-      P.get(k).push([s === cur ? 1 : 0, side === 'h' ? 1 : 0, C.K.map((kk) => reussi(kk, va.s, vb.s) ? 1 : 0), x[side].nom, x[side].id, (va.s.G || 0) > 0 ? 1 : 0, (vb.s.G || 0) > 0 ? 1 : 0]);
+      P.get(k).push([s === cur ? 1 : 0, side === 'h' ? 1 : 0, C.K.map((kk) => reussi(kk, va.s, vb.s) ? 1 : 0), x[side].nom, x[side].id, (va.s.G || 0) > 0 ? 1 : 0, (vb.s.G || 0) > 0 ? 1 : 0, sais.indexOf(s) >= 0 ? 1 : 0]);
     }
   }
   const R = [];
-  for (const [k, L] of P) {
+  for (const [k, L4] of P) {
+    const L = L4.filter((z) => z[7]);
     if (L.length < C.min[0]) continue; const S = L.filter((z) => z[0]); if (S.length < C.min[1]) continue;
     /* « b » (buteur) : les DEUX doivent marquer de temps en temps (≥ 10 % des matchs ensemble), sinon Haaland + son gardien sortirait en tête */
     if (C.K[0] === 'b' && (L.filter((z) => z[5]).length < 0.1 * L.length || L.filter((z) => z[6]).length < 0.1 * L.length)) continue;
@@ -46,12 +48,17 @@ for (const C of CONF) {
       o[kk] = [n, ok, nS, okS, pire, nD, okD, pD, nE, okE, pE, enc];
     });
     if (!bon) continue;
+    const o4 = {}; if (L4.length > L.length) C.K.forEach((kk, i) => {
+      const r = (M) => M.map((z) => z[2][i]);
+      const [n, ok, pire, enc] = stat(r(L4)), [nS, okS] = stat(r(L4.filter((z) => z[0]))), [nD, okD, pD] = stat(r(L4.filter((z) => z[1]))), [nE, okE, pE] = stat(r(L4.filter((z) => !z[1])));
+      o4[kk] = [n, ok, nS, okS, pire, nD, okD, pD, nE, okE, pE, enc];
+    });
     const [a, b] = k.split('|'), last = L[L.length - 1];
     const lgK = C.f === 'nhl' ? 'nhl' : C.f === 'nba' ? 'nba' : C.f.slice(5), eq = IXE[lgK + '|' + last[4]] || [last[3], ''];
-    R.push([noms[a], a, noms[b], b, eq[0], last[4], o, eq[1]]);
+    R.push([noms[a], a, noms[b], b, eq[0], last[4], o, eq[1], o4]);
   }
   const k0 = C.K[C.f === 'nba' ? 1 : 0];
   R.sort((x, y) => y[6][k0][1] / y[6][k0][0] - x[6][k0][1] / x[6][k0][0]);
-  fs.writeFileSync('loi/duos/' + C.f + '.json', JSON.stringify({ v: 2, t: Date.now(), s: sais, K: C.K, L: R.slice(0, 120) }));
+  fs.writeFileSync('loi/duos/' + C.f + '.json', JSON.stringify({ v: 2, t: Date.now(), s: sais, s4: sais4, K: C.K, L: R.slice(0, 120) }));
   console.log('✅ ' + C.f + ' : ' + G.length + ' matchs · ' + R.length + ' duos · saisons ' + sais.join(', '));
 }
