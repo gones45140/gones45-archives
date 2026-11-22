@@ -240,6 +240,9 @@ function feuille(f, sm, sp, id) {
   /* 20261106k — 🏒 TIERS-TEMPS (Antoine : « buts par tiers-temps à faire aussi, KHL et NHL » + captures des paris par tiers du book).
      SONDÉ le 06/11 (console d'Antoine, scoreboard NHL) : competitors[].linescores = [{ value, period 1/2/3(/4 prolongation) }] → f.pe = [[dom, ext], …]
      un couple par période, même ordre que f.f (domicile, extérieur). */
+  /* 20261123e (« 3 » = quart-temps avec le plus de points NBA / NFL ; SONDÉ console d'Antoine 23/11 : scoreboard NBA 20261120, NFL 20261116 et
+     NBA 20240115 → competitors[].linescores [{ period 1-4, value }] partout) : f.pe aussi pour le basket et le foot US (quarts-temps). */
+  if (sp === 'basketball' || sp === 'football') { try { const pe = periodes((((sm.header || {}).competitions || [])[0] || {}).competitors); if (pe && pe.length >= 4) f.pe = pe; } catch (e) {} }
   if (sp === 'hockey') { try { const pe = periodes((((sm.header || {}).competitions || [])[0] || {}).competitors); if (pe) f.pe = pe; } catch (e) {} try { const b1 = premiersButs(f, sm); if (b1) f.b1 = b1; } catch (e) {} }
   const met = (id, n, k, cle, v) => { if (v == null || v === '' || +v === 0 || isNaN(+v) && cle !== 'TOI' && cle !== 'MIN') return; const o = st[id] || (st[id] = { n, k, s: {} }); o.s[cle] = isNaN(+v) ? v : +v; };
   if (sp === 'soccer') {
@@ -490,16 +493,22 @@ if (PEL) {
     for (const f of F) {
       const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
       if (!Object.values(D).some((x) => x.f && !x.pe)) continue;
-      const sb = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/scoreboard?dates=${f.slice(0, 7).replace('-', '')}&limit=1000`);
+      /* 20261123e : NFL = scoreboard JOUR par JOUR (le mois entier n'est pas sûr côté foot US) ; dates UTC du match + la veille (soirée US) */
+      const J = new Set(); if (sp === 'football') Object.values(D).forEach((x) => { if (x.f && !x.pe && x.t) [0, -864e5].forEach((d) => J.add(new Date(x.t + d).toISOString().slice(0, 10).replace(/-/g, ''))); });
+      const QS = sp === 'football' ? [...J] : [f.slice(0, 7).replace('-', '')];
       let maj = false;
-      for (const e of (sb && sb.events) || []) {
-        const x = D[e.id]; if (!x || x.pe || !x.f) continue; n++;
-        const pe = periodes(((e.competitions || [])[0] || {}).competitors); if (pe) { x.pe = pe; ok++; maj = true; }
+      for (const q of QS) {
+        const sb = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/scoreboard?dates=${q}&limit=1000`);
+        for (const e of (sb && sb.events) || []) {
+          const x = D[e.id]; if (!x || x.pe || !x.f) continue; n++;
+          const pe = periodes(((e.competitions || [])[0] || {}).competitors); if (pe && (sp === 'hockey' || pe.length >= 4)) { x.pe = pe; ok++; maj = true; }
+        }
+        if (QS.length > 1) await pause(200);
       }
       if (maj) fs.writeFileSync(p, JSON.stringify(D));
       await pause(300);
     }
-    console.log(`🏒 ${lg} ${sa} : ${ok} matchs avec tiers (cumul, ${n} vus)`);
+    console.log(`⏱️ ${lg} ${sa} : ${ok} matchs avec périodes (cumul, ${n} vus)`);
   }
   indexer(sp, lg);
   process.exit(0);
