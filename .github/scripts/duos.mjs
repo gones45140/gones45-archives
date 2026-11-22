@@ -9,10 +9,14 @@
    { clé: [n, ok, nS, okS, pire, nD, okD, pireD, nE, okE, pireE, ratésEnCours] }]] }. Gardés : assez de matchs ensemble (NHL / NBA 50 dont 10
    cette saison ; foot 20 dont 4), réussite ≥ 30 % sur au moins une clé ; 120 duos max (les mieux classés sur la 1re clé). */
 import fs from 'node:fs';
-const CONF = [{ f: 'nhl', d: 'cotes/hockey/nhl/', K: ['b'], min: [50, 10] }, { f: 'nba', d: 'cotes/basket/nba/', K: ['m19.5', 'm24.5', 'm29.5', 'm34.5', 's39.5', 's44.5', 's49.5', 's54.5'], min: [50, 10] }]
+const CONF = [{ f: 'nhl', d: 'cotes/hockey/nhl/', K: ['g1', 'g2', 'a1', 'a2', 'p1', 'p2', 'p3'], min: [50, 10] }, { f: 'nba', d: 'cotes/basket/nba/', K: ['m19.5', 'm24.5', 'm29.5', 'm34.5', 's39.5', 's44.5', 's49.5', 's54.5'], min: [50, 10] }]
   .concat(['fra.1', 'eng.1', 'esp.1', 'ita.1', 'ger.1', 'ned.1', 'por.1'].map((lg) => ({ f: 'foot-' + lg, d: 'cotes/foot/' + lg + '/', K: ['b'], min: [20, 4], foot: 1 })));
 const joue = (C, v) => v && v.s && (C.foot ? v.s.TIT : v.s.J);
-const reussi = (k, sa, sb) => { if (k === 'b') return (sa.G || 0) + (sb.G || 0) > 0; const L = +k.slice(1); return k[0] === 'm' ? Math.max(sa.PTS || 0, sb.PTS || 0) > L : (sa.PTS || 0) + (sb.PTS || 0) > L; };
+/* 20261122e (capture critère « Eichel + Stone · ⭐ Pointeur · 2 ou + · Au moins un (double chance) » : « c'est pas trop la même sélection »,
+   la liste était toujours « buteur 1 ou + ») : NHL = une clé par rôle et par seuil (g buteur, a passeur, p pointeur = G + A ; 1 / 2 / 3 ou +),
+   réussi = au moins UN des deux atteint le seuil. */
+const reussi = (k, sa, sb) => { if (k === 'b') return (sa.G || 0) + (sb.G || 0) > 0;
+  if (/^[gap]\d$/.test(k)) { const v = (x) => k[0] === 'g' ? (x.G || 0) : k[0] === 'a' ? (x.A || 0) : (x.G || 0) + (x.A || 0); return Math.max(v(sa), v(sb)) >= +k[1]; } const L = +k.slice(1); return k[0] === 'm' ? Math.max(sa.PTS || 0, sb.PTS || 0) > L : (sa.PTS || 0) + (sb.PTS || 0) > L; };
 const stat = (L) => { let ok = 0, pire = 0, c = 0; for (const z of L) { if (z) { ok++; c = 0; } else { c++; if (c > pire) pire = c; } } return [L.length, ok, pire, c]; };
 fs.mkdirSync('loi/duos', { recursive: true });
 /* 20261122b (capture : Lightning sans logo, le nom court « Lightning » n'était pas dans l'index) : nom COMPLET + logo par n° d'équipe ESPN (loi/equipes.json) */
@@ -39,7 +43,7 @@ for (const C of CONF) {
     const L = L4.filter((z) => z[7]);
     if (L.length < C.min[0]) continue; const S = L.filter((z) => z[0]); if (S.length < C.min[1]) continue;
     /* « b » (buteur) : les DEUX doivent marquer de temps en temps (≥ 10 % des matchs ensemble), sinon Haaland + son gardien sortirait en tête */
-    if (C.K[0] === 'b' && (L.filter((z) => z[5]).length < 0.1 * L.length || L.filter((z) => z[6]).length < 0.1 * L.length)) continue;
+    if ((C.K[0] === 'b' || C.f === 'nhl') && (L.filter((z) => z[5]).length < 0.1 * L.length || L.filter((z) => z[6]).length < 0.1 * L.length)) continue;
     const o = {}; let bon = false;
     C.K.forEach((kk, i) => {
       const r = (M) => M.map((z) => z[2][i]);
@@ -57,8 +61,10 @@ for (const C of CONF) {
     const lgK = C.f === 'nhl' ? 'nhl' : C.f === 'nba' ? 'nba' : C.f.slice(5), eq = IXE[lgK + '|' + last[4]] || [last[3], ''];
     R.push([noms[a], a, noms[b], b, eq[0], last[4], o, eq[1], o4]);
   }
-  const k0 = C.K[C.f === 'nba' ? 1 : 0];
-  R.sort((x, y) => y[6][k0][1] / y[6][k0][0] - x[6][k0][1] / x[6][k0][0]);
-  fs.writeFileSync('loi/duos/' + C.f + '.json', JSON.stringify({ v: 2, t: Date.now(), s: sais, s4: sais4, K: C.K, L: R.slice(0, 120) }));
-  console.log('✅ ' + C.f + ' : ' + G.length + ' matchs · ' + R.length + ' duos · saisons ' + sais.join(', '));
+  /* 20261122e : les 60 meilleurs de CHAQUE clé (sinon un duo fort en « pointeur 2+ » pouvait manquer, classé seulement sur la 1re clé) */
+  const garde = new Set();
+  for (const kk of C.K) R.slice().sort((x, y) => y[6][kk][1] / y[6][kk][0] - x[6][kk][1] / x[6][kk][0]).slice(0, 60).forEach((x) => garde.add(x));
+  const OUT = R.filter((x) => garde.has(x));
+  fs.writeFileSync('loi/duos/' + C.f + '.json', JSON.stringify({ v: 2, t: Date.now(), s: sais, s4: sais4, K: C.K, L: OUT }));
+  console.log('✅ ' + C.f + ' : ' + G.length + ' matchs · ' + R.length + ' duos (' + OUT.length + ' écrits) · saisons ' + sais.join(', '));
 }
