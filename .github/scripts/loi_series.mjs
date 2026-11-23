@@ -471,6 +471,17 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
       for (const x of [].concat(H.L, out)) if (x.lg === 'uefa.nations' && x.grp == null && GR[String(x.id)]) x.grp = GR[String(x.id)];
       console.log('Ligue des nations : groupes ' + Object.keys(GR).length + ' équipes'); }
   } catch (e) { console.log('classement Ligue des nations illisible', e.message); }
+  /* 20261124j (Antoine : « Getafe c'est considéré comme équipe moyenne ? » → filtre de niveau foot « oui ») : rang de l'équipe dans SON championnat
+     (miroir/soccer/<ligue>/standings.json, déjà archivé) gardé dans rg / nt (rang / nombre d'équipes) pour les pépites des championnats
+     (neuves et déjà gardées) ; l'appli ne compte pas les 6 dernières places (nf 10). */
+  try { const CH = ['fra.1', 'eng.1', 'esp.1', 'ita.1', 'ger.1', 'ned.1', 'por.1', 'fra.2', 'bra.1', 'arg.1'], RG = {};
+    for (const lg of CH) { const st = lireJ(`miroir/soccer/${lg}/standings.json`); if (!st) continue; const EN = [];
+      for (const c of (st.children && st.children.length ? st.children : [st])) EN.push(...(((c.standings || {}).entries) || []));
+      const T = {}; EN.forEach((e) => { const r = ((e.stats || []).find((q) => q.name === 'rank') || {}).value; if (e.team && e.team.id && r) T[String(e.team.id)] = +r; });
+      RG[lg] = { T, n: Object.keys(T).length }; }
+    let nR = 0; for (const x of [].concat(H.L, out)) { if (x.sp !== 'soccer' || !RG[x.lg] || x.rg != null) continue; const r = RG[x.lg].T[String(x.jo ? x.tid : x.id)]; if (r) { x.rg = r; x.nt = RG[x.lg].n; nR++; } }
+    console.log('rang championnat foot ajouté : ' + nR + ' pépites');
+  } catch (e) { console.log('classements foot illisibles', e.message); }
   { const SBc = {};
     for (const x of H.L) {
       if (x.lg !== 'concacaf.nations.league' || x.stg != null) continue;
