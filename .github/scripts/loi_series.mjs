@@ -110,10 +110,15 @@ const now = Date.now(), fin = now + H24, out = [];
    victoire, même si la série sort des bornes (record battu, écart avec la pire série) ; x.sv = 1 (suivi de montante). */
 const OUV = new Set();
 { const H0 = (() => { try { return JSON.parse(fs.readFileSync('loi/historique.json', 'utf8')); } catch (e) { return { L: [] }; } })(), der = {};
-  for (const x of H0.L || []) { if (x.r !== 0 && x.r !== 1) continue; const c = x.id + '|' + x.k; if (!der[c] || x.t > der[c].t) der[c] = x; }
+  /* 20261124t (capture Levante « Victoire 🌍 3 ratés · montante en cours, à finir » : « mais on avait dit série de 4 mini ») : la montante
+     ouverte venait de « Levante Victoire ✈️ » (7 ratés, perdue le 08/11) ; la clé n'avait PAS le lieu → la série 🌍 (3) et 🏠 (1) d'un match
+     à domicile passaient pour la même montante. Clé = équipe | pari | LIEU : une montante ✈️ ne suit que les matchs à l'extérieur, 🌍 tous. */
+  for (const x of H0.L || []) { if (x.r !== 0 && x.r !== 1) continue; const c = (x.sp || '') + '|' + x.id + '|' + x.k + '|' + (x.lieu || 'tout'); if (!der[c] || x.t > der[c].t) der[c] = x; }
   for (const c in der) if (der[c].r === 0 && now - der[c].t < 45 * 864e5) OUV.add(c);
   console.log('montantes ouvertes suivies : ' + OUV.size); }
-const garde = (R, id, k) => R.n >= MIN_N && R.cours >= 1 && (OUV.has(String(id) + '|' + k) || !(R.pire < PIRE_MIN || (R.pa || R.pire) > PIRE_MAX /* 20261118f : record des séries TERMINÉES (une série en cours de 8 avec un record de 5 reste suivie) */ || R.cours < COURS_MIN || R.pire - R.cours > 1));
+/* 20261124t : + SPORT dans la clé (l'id « 21 » = Toronto NHL, Philadelphia NFL ET Phoenix NBA : une victoire des Eagles fermait la montante des Leafs) */
+const ouv = (sp, id, k, lieu) => OUV.has((sp || '') + '|' + String(id) + '|' + k + '|' + (lieu || 'tout'));
+const garde = (R, id, k, lieu, sp) => R.n >= MIN_N && R.cours >= 1 && (ouv(sp, id, k, lieu) || !(R.pire < PIRE_MIN || (R.pa || R.pire) > PIRE_MAX /* 20261118f : record des séries TERMINÉES (une série en cours de 8 avec un record de 5 reste suivie) */ || R.cours < COURS_MIN || R.pire - R.cours > 1));
 let nMatchs = 0;
 for (const [sp, lg] of LIGUES) {
   const vus = new Set();
@@ -137,7 +142,7 @@ for (const [sp, lg] of LIGUES) {
           for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
             const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
             const R = serie(ms, f);
-            if (!garde(R, id, k)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
+            if (!garde(R, id, k, lieu, sp)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
             const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;   // même chiffre en 🏠 et partout : une seule ligne
             out.push({ sp, lg, ligue, eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
               d: dom ? 1 : 0, lieu, k, lib,
@@ -275,16 +280,16 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
             if (ABS.has(String(pid))) { nAbs++; continue; }
             const E = matchsJoueur(sp, pid); if (!E || E.L.length < MIN_N) continue; C.j++;
             /* 20261119e (« une équipe qui joue une série pariée déjà en cours, on la garde ? » → « oui go ») : montante ouverte → aucun filtre de retrait */
-            const moJ = PJ[sp].paris.some((p) => OUV.has('j' + pid + '|' + p[0])) || [...OUV].some((c) => c.startsWith('j' + pid + '|'));
+            const moJ = [...OUV].some((c) => c.startsWith(sp + '|j' + pid + '|'));
             if (!moJ && !assezDeSaisons(sp, E, sa[sa.length - 1])) { nSai++; continue; }   /* 20261118o */
             if (!moJ && !titulaire(sp, E)) { nTit++; continue; }   /* 20261119b */
             for (const [k, lib, f] of parisDe(sp, E)) { const vu = {};
               for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
                 const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom), R = serieJ(ms, f);
-                if (ms.length < MIN_N || !garde(R, 'j' + pid, k)) continue;
+                if (ms.length < MIN_N || !garde(R, 'j' + pid, k, lieu, sp)) continue;
                 /* 20261118h : anti-bruit joueurs (Dries buteur 31 ratés en cours, 13 % de réussite = un joueur qui ne marque pas, pas une série) :
                    réussite ≥ 30 % des matchs joués ET série en cours ≤ record passé + 3 */
-                const moK = OUV.has('j' + pid + '|' + k);   /* 20261119e */
+                const moK = ouv(sp, 'j' + pid, k, lieu);   /* 20261119e ; 20261124t : du même lieu */
                 if (!moK && !bonJ(sp, E, k)) { nProd++; continue; }   /* 20261124h / i */
                 if (!moK && (R.ok / R.n < 0.30 || R.cours > (R.pa || 0) + 3)) continue;
                 /* 20261118q (Antoine, joueurs NBA : « pire série sur 5 ans 6 maximum, mais 5 sur les deux dernières années complètes ; s'il y a du 7
@@ -325,7 +330,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
             for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
               const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
               const R = serie(ms, f);
-              if (!garde(R, id, k)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
+              if (!garde(R, id, k, lieu, 'soccer')) continue;   // 20261116f : bornes de la pépite OU montante ouverte
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
               out.push({ sp: 'soccer', lg, ligue, sel: 1, stg: (ev.season && ev.season.slug) || '', eid: String(ev.id), t, id: String(id), eq: E.nom || (co.team.displayName || ''), adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '',
                 d: dom ? 1 : 0, lieu, k, lib, llogo: (lgD && lgD.href) || '', logo: (co.team && co.team.logo) || '', c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '',
@@ -372,7 +377,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
             for (const lieu of [dom ? 'dom' : 'ext', 'tout']) {
               const ms = lieu === 'tout' ? E.L : E.L.filter((m) => m.d === dom);
               const R = serie(ms, f);
-              if (!garde(R, co.id, k)) continue;   // 20261116f : bornes de la pépite OU montante ouverte
+              if (!garde(R, co.id, k, lieu, 'hockey')) continue;   // 20261116f : bornes de la pépite OU montante ouverte
               const sig = R.pire + '|' + R.cours; if (vu[sig]) continue; vu[sig] = 1;
               out.push({ sp: 'hockey', lg: 'khl', ligue: 'KHL', eid: 'khl' + e.id, t, id: String(co.id), eq: E.nom || co.name || '', adv: adv.name || '', d: dom ? 1 : 0, lieu, k, lib,
                 llogo: '', logo: co.image || '', c: '', alogo: adv.image || '', pire: R.pire, pa: R.pa, cours: R.cours, n: R.n, ok: R.ok, qv: R.qv || undefined,
@@ -397,7 +402,7 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
    le résultat est relu dans les archives (equipes/<id>.json de la saison, m[2] = n° du match, m[4] = score, m[6] = prolongation) :
    r = 1 → le pari a gagné (la série s'est arrêtée), 0 → encore raté ; sc = « pour-contre ». Pas trouvé 10 jours après → r = -1 (annulé / reporté). ═══ */
 {
-  for (const x of out) if (OUV.has(String(x.id) + '|' + x.k)) x.mo = 1;   /* 20261119e : pépite d'une montante déjà ouverte (P2 et +) */
+  for (const x of out) if (ouv(x.sp, x.id, x.k, x.lieu)) x.mo = 1;   /* 20261124t : même lieu */   /* 20261119e : pépite d'une montante déjà ouverte (P2 et +) */
   const H = lireJ('loi/historique.json') || { L: [] }, cle = (x) => [x.eid, x.id, x.k, x.lieu].join('|'), vus = new Set(H.L.map(cle));
   const jourP = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
   let neufs = 0, regles = 0;
@@ -444,7 +449,9 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
   /* 20261116f : montante ouverte → les matchs JOUÉS par l'équipe depuis sa dernière pépite (pas notés parce que la série était sortie des
      bornes, ex. Bucks 14/11) sont ajoutés (sv: 1), dans l'ordre, jusqu'au 1er pari gagné ; le règlement plus bas les juge comme les autres. */
   { let nSv = 0; const der = {};
-    for (const x of H.L) { if (x.r !== 0 && x.r !== 1) continue; const c = x.id + '|' + x.k; if (!der[c] || x.t > der[c].t) der[c] = x; }
+    for (const x of H.L) { if (x.r !== 0 && x.r !== 1) continue; const c = (x.sp || '') + '|' + x.id + '|' + x.k + '|' + (x.lieu || 'tout'); if (!der[c] || x.t > der[c].t) der[c] = x; }   /* 20261124t : par lieu */
+    /* 20261124t : pépites pas encore jouées marquées mo par l'ancienne clé (sans lieu) → mo retiré si leur lieu n'a pas de montante ouverte */
+    for (const x of H.L) if (x.r == null && x.mo && !x.sv && !ouv(x.sp, x.id, x.k, x.lieu)) delete x.mo;
     for (const c in der) {
       const x0 = der[c]; if (x0.r !== 0 || now - x0.t > 45 * 864e5) continue;
       const f = ((PARIS[x0.sp] || []).find((p) => p[0] === x0.k) || [])[2]; if (!f) continue;
@@ -452,10 +459,11 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
       const M = []; for (const s0 of sa) { const q = lireJ(`${base}/${s0}/equipes/${x0.id}.json`); for (const m of ((q && q.m) || [])) if (m && m[0] > x0.t + 3 * 3600e3 && m[0] < now - 3 * 3600e3 && m[4] && m[4][0] != null && m[4][1] != null && (!US.has(x0.sp) || m[5] === 2)) M.push(m); }
       M.sort((a, b) => a[0] - b[0]); let nIci = 0;
       for (const m of M) {
-        const eid = (String(x0.eid).indexOf('khl') === 0 ? 'khl' : '') + m[2], dom = m[3] === 'h';
-        if (vus.has([eid, x0.id, x0.k, x0.lieu].join('|')) || vus.has([eid, x0.id, x0.k, 'tout'].join('|'))) break;
-        vus.add([eid, x0.id, x0.k, 'tout'].join('|'));   /* lieu « tout » : la montante suit TOUS les matchs (🏠 et ✈️) → 🌍 */
-        H.L.push({ j: jourP(m[0]), t: m[0], sp: x0.sp, lg: x0.lg, ligue: x0.ligue, eid, id: x0.id, eq: x0.eq, adv: '', d: dom ? 1 : 0, lieu: 'tout', k: x0.k, lib: x0.lib, pire: Math.max(x0.pire, x0.cours + nIci + 1), ...(x0.pa != null ? { pa: x0.pa } : {}), cours: x0.cours + nIci + 1, logo: x0.logo || '', c: x0.c || '', r: null, sv: 1 });
+        const eid = (String(x0.eid).indexOf('khl') === 0 ? 'khl' : '') + m[2], dom = m[3] === 'h', lx = x0.lieu || 'tout';
+        if ((lx === 'dom' && !dom) || (lx === 'ext' && dom)) continue;   /* 20261124t : montante 🏠 / ✈️ → seulement les matchs de CE lieu */
+        if (vus.has([eid, x0.id, x0.k, lx].join('|'))) break;
+        vus.add([eid, x0.id, x0.k, lx].join('|'));   /* 20261124t : le suivi garde le lieu de la montante (avant : toujours « tout ») */
+        H.L.push({ j: jourP(m[0]), t: m[0], sp: x0.sp, lg: x0.lg, ligue: x0.ligue, eid, id: x0.id, eq: x0.eq, adv: '', d: dom ? 1 : 0, lieu: lx, k: x0.k, lib: x0.lib, pire: Math.max(x0.pire, x0.cours + nIci + 1), ...(x0.pa != null ? { pa: x0.pa } : {}), cours: x0.cours + nIci + 1, logo: x0.logo || '', c: x0.c || '', r: null, sv: 1 });
         nSv++; nIci++;
         const p = dom ? +m[4][0] : +m[4][1], cc = dom ? +m[4][1] : +m[4][0]; if (f(p, cc, m[6] ? 1 : 0)) break;
       }
