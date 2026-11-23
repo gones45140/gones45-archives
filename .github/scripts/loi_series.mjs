@@ -248,8 +248,11 @@ function titulaire(sp, E) { const R = E.L.slice(-10); if (!R.length) return fals
     return T.length ? T.reduce((a, v) => a + v, 0) / T.length >= 16 : true; }
   return true; }
 /* 20261124h : NHL, production sur les 82 derniers matchs joués selon le pari : pointeur ≥ 0,8 point / match, buteur ≥ 0,35 but, passeur ≥ 0,5 passe. */
-const NHL_PROD = { jp: [(s) => nb(s.G) + nb(s.A), 0.8], jb: [(s) => nb(s.G), 0.35], ja: [(s) => nb(s.A), 0.5] };
-function bonNhl(E, k) { const r = NHL_PROD[k]; if (!r) return true; const L = E.L.slice(-82); if (!L.length) return false; return L.reduce((a, m) => a + r[0](m.s), 0) / L.length >= r[1]; }
+/* 20261124i (bilan du 22/11 annoté : Fields / LaPorta / Sutton touchdown, Berardi décisif → « ? » → « oui go ») : NFL touchdown ≥ 0,5 TD / match
+   sur les 17 derniers matchs joués (écarte les QB et les receveurs peu servis) ; foot décisif ≥ 0,5 but + passe / match sur les 30 derniers. */
+const PROD = { hockey: { n: 82, jp: [(s) => nb(s.G) + nb(s.A), 0.8], jb: [(s) => nb(s.G), 0.35], ja: [(s) => nb(s.A), 0.5] },
+  football: { n: 17, jt: [(s) => nb(s.rTD) + nb(s.reTD), 0.5] }, soccer: { n: 30, jd: [(s) => nb(s.G) + nb(s.A), 0.5] } };
+function bonJ(sp, E, k) { const P = PROD[sp], r = P && P[k]; if (!r) return true; const L = E.L.slice(-P.n); if (!L.length) return false; return L.reduce((a, m) => a + r[0](m.s), 0) / L.length >= r[1]; }
 let nProd = 0;
 function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d, p: m, c: 0 })), (m) => f(m.s)); }
 { const cpt = {};
@@ -282,7 +285,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
                 /* 20261118h : anti-bruit joueurs (Dries buteur 31 ratés en cours, 13 % de réussite = un joueur qui ne marque pas, pas une série) :
                    réussite ≥ 30 % des matchs joués ET série en cours ≤ record passé + 3 */
                 const moK = OUV.has('j' + pid + '|' + k);   /* 20261119e */
-                if (sp === 'hockey' && !moK && !bonNhl(E, k)) { nProd++; continue; }   /* 20261124h */
+                if (!moK && !bonJ(sp, E, k)) { nProd++; continue; }   /* 20261124h / i */
                 if (!moK && (R.ok / R.n < 0.30 || R.cours > (R.pa || 0) + 3)) continue;
                 /* 20261118q (Antoine, joueurs NBA : « pire série sur 5 ans 6 maximum, mais 5 sur les deux dernières années complètes ; s'il y a du 7
                    parmi les saisons complètes on enlève ; on parle pas de la saison en cours ») : pire série de CHAQUE saison terminée ≤ 6, et ≤ 5
@@ -297,7 +300,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
               } } } } } }
   }
   for (const sp of Object.keys(cpt)) console.log(`👤 joueurs ${sp} : ${cpt[sp].j} joueurs lus, ${cpt[sp].p} pépites`);
-  console.log(`👤 joueurs annoncés absents (Out / suspendus) écartés : ${nAbs} ; moins de 2 saisons entières + saison en cours : ${nSai} ; NBA saisons terminées > 6 (ou > 5 sur les 2 dernières) : ${nNba} ; pas titulaires : ${nTit} ; NHL production trop faible : ${nProd}`);
+  console.log(`👤 joueurs annoncés absents (Out / suspendus) écartés : ${nAbs} ; moins de 2 saisons entières + saison en cours : ${nSai} ; NBA saisons terminées > 6 (ou > 5 sur les 2 dernières) : ${nNba} ; pas titulaires : ${nTit} ; production trop faible (NHL / TD NFL / décisif foot) : ${nProd}`);
 }
 /* 20261113h : pépites des sélections (matchs des 24 h de chaque compétition, séries sur toutes les compétitions) */
 {
