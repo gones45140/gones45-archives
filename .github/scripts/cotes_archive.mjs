@@ -140,6 +140,10 @@ for (const [sp, lg] of (RAT ? [] : LIGUES)) {
       // propBets + noms
       const pb = await lire(`https://sports.core.api.espn.com/v2/sports/${sp}/leagues/${lg}/events/${e.id}/competitions/${e.id}/odds/100/propBets?limit=500`);
       const items = ((pb && pb.items) || []).filter((x) => typeOk(sp, String((x.type || {}).id)));
+      /* 20261125 (relevé, Antoine « oui mets le relevé ») : pépite « touchdown » NFL jamais comptée faute de cote (sonde 24/11 : lignes 29-33 SANS prix
+         chez ESPN, même 2 h avant le match) → par match NFL : lignes touchdown vues / avec un prix, pour trancher (garder les prix ou estimer). */
+      if (sp === 'football') { const td = ((pb && pb.items) || []).filter((x) => /^(29|30|31|32|33)$/.test(String((x.type || {}).id)));
+        console.log('🏈 relevé TD ' + e.id + ' (' + (e.name || '') + ') : ' + (pb ? (pb.count || 0) + ' lignes, ' : 'propBets illisibles, ') + td.length + ' lignes touchdown, ' + td.filter((x) => cotePb(x)).length + ' avec un prix'); }
       if (items.length) {
         const noms = {};
         for (const k of ['h', 'a']) {
