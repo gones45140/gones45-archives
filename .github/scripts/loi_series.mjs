@@ -259,6 +259,13 @@ const PROD = { hockey: { n: 82, jp: [(s) => nb(s.G) + nb(s.A), 0.8], jb: [(s) =>
   football: { n: 17, jt: [(s) => nb(s.rTD) + nb(s.reTD), 0.5] }, soccer: { n: 30, jd: [(s) => nb(s.G) + nb(s.A), 0.5] } };
 function bonJ(sp, E, k) { const P = PROD[sp], r = P && P[k]; if (!r) return true; const L = E.L.slice(-P.n); if (!L.length) return false; return L.reduce((a, m) => a + r[0](m.s), 0) / L.length >= r[1]; }
 let nProd = 0;
+/* 20261126a (pépite Anfernee Simons 3+ passes, remplaçant ce soir : « oui ») : NBA — titulaire (TIT, robot cotes-archive + rattrapage) sur les
+   5 derniers matchs joués de la SAISON EN COURS (les anciennes saisons n'ont pas l'info) → { b : sorti du banc, n : matchs, s : remplaçant de suite
+   depuis le dernier match }, seulement s'il a été remplaçant au moins une fois. */
+function tiDe(sp, E, cur) { if (sp !== 'basketball') return undefined; const R = E.L.filter((m) => m.sa === cur).slice(-5); if (R.length < 3) return undefined;
+  if (!E.L.some((m) => m.sa === cur && m.s && m.s.TIT)) return undefined;   /* saison pas encore rattrapée : pas d'info */
+  const b = R.filter((m) => !(m.s && m.s.TIT)).length; if (!b) return undefined; let st = 0; for (let i = R.length - 1; i >= 0 && !(R[i].s && R[i].s.TIT); i--) st++;
+  return { b, n: R.length, s: st }; }
 function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d, p: m, c: 0 })), (m) => f(m.s)); }
 { const cpt = {};
   for (const sp of Object.keys(PJ)) for (const lg of PJ[sp].lgs) {
@@ -301,7 +308,7 @@ function serieJ(ms, f) { return serie(ms.map((m) => ({ t: m.t, sa: m.sa, d: m.d,
                 out.push({ sp, lg, ligue, eid: String(ev.id), t, id: 'j' + pid, jo: 1, jid: String(pid), tid, eq: E.nom || P[0], equipe: (co.team && (co.team.displayName || '')) || '',
                   adv: (adv && adv.team && (adv.team.displayName || adv.team.shortDisplayName)) || '', d: dom ? 1 : 0, lieu, k, lib, llogo,
                   logo: `https://a.espncdn.com/i/headshots/${PJ[sp].ph}/players/full/${pid}.png`, tlogo: (co.team && co.team.logo) || '' /* 20261119k : logo du club sous la photo */, c: (co.team && co.team.color) || '', alogo: (adv && adv.team && adv.team.logo) || '',
-                  pire: R.pire, pa: R.pa, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s0) => (R.parS[s0] ? R.parS[s0].pire : null)).filter((x) => x != null) });
+                  ti: tiDe(sp, E, sa[sa.length - 1]), pire: R.pire, pa: R.pa, cours: R.cours, n: R.n, ok: R.ok, p: E.sa.slice().reverse().map((s0) => (R.parS[s0] ? R.parS[s0].pire : null)).filter((x) => x != null) });
               } } } } } }
   }
   for (const sp of Object.keys(cpt)) console.log(`👤 joueurs ${sp} : ${cpt[sp].j} joueurs lus, ${cpt[sp].p} pépites`);
@@ -410,11 +417,12 @@ console.log(`Loi des séries : ${nMatchs} matchs dans les 24 h, ${out.length} p�
      l'historique ; pépites déjà gardées (même eid / id / pari / lieu) complétées depuis la liste du jour. */
   { const P = new Map(out.filter((x) => x.p && x.p.length).map((x) => [cle(x), x.p])); for (const h of H.L) if (!h.p && P.has(cle(h))) h.p = P.get(cle(h));
     const T = new Map(out.filter((x) => x.tlogo).map((x) => [cle(x), x.tlogo])); for (const h of H.L) if (h.jo && !h.tlogo && T.has(cle(h))) h.tlogo = T.get(cle(h)); }   /* 20261119k */
+  { const TI = new Map(out.filter((x) => x.ti).map((x) => [cle(x), x.ti])); for (const h of H.L) if (h.jo && h.r == null && TI.has(cle(h))) h.ti = TI.get(cle(h)); }   /* 20261126a : 🪑 remplaçant */
   /* 20261118s (bilan : Alef Manga / Viveros / Kris Murray gardés le matin, AVANT les filtres joueurs 2 saisons / NBA / absents) : pépite JOUEUR
      pas encore jouée qui n'est plus dans la liste du jour → retirée de l'historique (les équipes ne changent pas). */
   { const OK = new Set(out.map(cle)), n0 = H.L.length; H.L = H.L.filter((h) => { const ko = h.jo && h.r == null && h.t > now && !OK.has(cle(h)); if (ko) vus.delete(cle(h)); return !ko; }); if (H.L.length < n0) console.log(`👤 pépites joueurs retirées de l'historique (plus dans la liste) : ${n0 - H.L.length}`); }
   for (const x of out) { if (vus.has(cle(x))) continue; vus.add(cle(x)); neufs++;
-    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, ...(x.jo ? { jo: 1, jid: x.jid, tid: x.tid, equipe: x.equipe, ...(x.tlogo ? { tlogo: x.tlogo } : {}) } : {}), ...(x.p && x.p.length ? { p: x.p } : {}), ...(x.mo ? { mo: 1 } : {}), pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
+    H.L.push({ j: jourP(x.t), t: x.t, sp: x.sp, lg: x.lg, ligue: x.ligue, eid: x.eid, id: x.id, eq: x.eq, adv: x.adv, d: x.d, lieu: x.lieu, k: x.k, lib: x.lib, ...(x.jo ? { jo: 1, jid: x.jid, tid: x.tid, equipe: x.equipe, ...(x.tlogo ? { tlogo: x.tlogo } : {}), ...(x.ti ? { ti: x.ti } : {}) } : {}), ...(x.p && x.p.length ? { p: x.p } : {}), ...(x.mo ? { mo: 1 } : {}), pire: x.pire, ...(x.pa != null ? { pa: x.pa } : {}), cours: x.cours, logo: x.logo || '', c: x.c || '', r: null, ...(x.stg ? { stg: x.stg } : {}), ...(x.n ? { n: x.n, ok: x.ok } : {}) }); }   /* 20261116i : n / ok = taux de réussite (pépites opposées) */
   /* 20261116b (Antoine : « Concacaf A on compte, Concacaf B ou + non ») : phase ESPN (season.slug : quarterfinals = ligue A, group-stage /
      gold-cup-play-in-prelims = ligues B / C, sondé par Antoine le 16/11) gardée dans stg ; pépites Concacaf déjà gardées sans stg → relue
      UNE fois dans le scoreboard du jour (et de la veille, fuseau). */
