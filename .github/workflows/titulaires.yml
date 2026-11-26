@@ -1,0 +1,37 @@
+# 20261126a — 🪑 rattrapage des titulaires NBA de la saison en cours (une fois, à la main ; ensuite le robot cotes-archive les garde)
+name: titulaires
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/titulaires.yml']
+concurrency:
+  group: cotes-archive
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  tit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Titulaires NBA
+        run: node .github/scripts/cotes_archive.mjs
+        env:
+          TIT_LIGUE: nba
+      - name: Enregistrement
+        run: |
+          git config user.name "Archive cotes"
+          git config user.email "actions@users.noreply.github.com"
+          git add "cotes" 2>/dev/null || true
+          if git diff --cached --quiet; then echo "Rien de nouveau"; exit 0; fi
+          git commit -m "Titulaires NBA (rattrapage) $(TZ=Europe/Paris date +'%d/%m %Hh%M')"
+          for i in 1 2 3 4 5; do
+            git pull --rebase -X theirs origin main && git push origin HEAD:main && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          exit 1

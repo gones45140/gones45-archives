@@ -115,7 +115,7 @@ const cotePb = (x) => { let d = dec((x.odds || {}).decimal); const ov = (x.curre
 const maintenant = Date.now(), fichiers = {};
 let nEv = 0, nJ = 0;
 // 20261031a : RATTRAPAGE=<ligue> (bouton du robot, 4 saisons passées) → seulement la partie rattrapage, en fin de fichier
-const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE || process.env.KHL_ARCH || process.env.IDX_LIGUE || process.env.B1_LIGUE ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
+const RAT = process.env.RATTRAPAGE || (process.env.HC_LIGUE || process.env.PB_LIGUE || process.env.PE_LIGUE || process.env.KHL_ARCH || process.env.IDX_LIGUE || process.env.B1_LIGUE || process.env.TIT_LIGUE ? 'hc' : '');   /* 20261106k : + PE_LIGUE */   /* 20261103b : HC_LIGUE saute aussi le passage normal */
 for (const [sp, lg] of (RAT ? [] : LIGUES)) {
   const jours = [0, 1].map((k) => new Date(maintenant + k * 864e5).toISOString().slice(0, 10).replace(/-/g, ''));
   const vus = new Set();
@@ -284,6 +284,7 @@ function feuille(f, sm, sp, id) {
         const lab = cat.labels || [];
         for (const a of cat.athletes || []) {
           const at = a.athlete || {}; if (!at.id || a.didNotPlay) continue;
+          if (sp === 'basketball' && a.starter) met(String(at.id), at.displayName, k, 'TIT', 1);   /* 20261126a (Anfernee Simons, pépite 3+ passes, remplaçant ce soir : « oui ») : titulaire NBA (SONDÉ 25/11 : boxscore athletes[].starter, match commencé) → 🪑 sur la pépite */
           met(String(at.id), at.displayName, k, 'J', 1);   /* 20261031n : a joué (même sans stat) = présence, comme _g45JouPresents de l'appli */
           const cn = cat.name || cat.type;   /* 20261031l : SONDÉ MLB (29/10) — catégories sans name, type « batting » / « pitching » */
           lab.forEach((L, i) => { const c = M[(cn ? cn + ':' : '') + L] || (sp !== 'football' ? M[L] : null); if (!c) return; let v = (a.stats || [])[i]; if (c === '3PT') v = parseInt(String(v || '').split('-')[0], 10); met(String(at.id), at.displayName, k, c, v); });
@@ -486,6 +487,32 @@ if (process.env.B1_LIGUE) {
     console.log(`🏒 ${lg} ${sa} : 1er but des tiers — déduits ${nD}, fiches ${nF}, ratés ${nX} (cumul)`);
   }
   indexer(sp, lg); process.exit(0);
+}
+/* 20261126a — 🪑 RATTRAPAGE DES TITULAIRES (TIT_LIGUE=nba) : saison en cours, matchs finis avec feuille (x.st) sans aucun TIT → summary ESPN,
+   boxscore.players[].statistics[].athletes[].starter → st[id].s.TIT = 1, puis index (joueurs/<id>.json m[4].TIT). */
+const TITL = process.env.TIT_LIGUE || '';
+if (TITL) {
+  const L = LIGUES.find((x) => x[1] === TITL); if (!L) { console.log('ligue inconnue ' + TITL); process.exit(0); }
+  const [sp, lg] = L, B = BASE(sp, lg); let sas = []; try { sas = fs.readdirSync(B).filter((d) => /^\d{4}(-\d{2})?$/.test(d)).sort(); } catch (e) {}
+  const sa = sas[sas.length - 1]; let F = []; try { F = fs.readdirSync(`${B}/${sa}/matchs`).filter((f) => /\.json$/.test(f)); } catch (e) {}
+  let n = 0, ok = 0, nt = 0;
+  for (const f of F) {
+    const p = `${B}/${sa}/matchs/${f}`; let D = {}; try { D = JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { continue; }
+    let maj = false;
+    for (const [id, x] of Object.entries(D)) {
+      if (!x.f || !x.st || Object.values(x.st).some((o) => o && o.s && o.s.TIT)) continue; n++;
+      const sm = await lire(`https://site.api.espn.com/apis/site/v2/sports/${sp}/${lg}/summary?event=${id}`); if (!sm) continue;
+      let c = 0;
+      for (const eq of (sm.boxscore || {}).players || []) for (const cat of eq.statistics || []) for (const a of cat.athletes || []) {
+        const at = a.athlete || {}, o = x.st[String(at.id)]; if (a.starter && o) { o.s = o.s || {}; o.s.TIT = 1; c++; } }
+      if (c) { ok++; nt += c; maj = true; }
+      await pause(250);
+    }
+    if (maj) fs.writeFileSync(p, JSON.stringify(D));
+  }
+  console.log(`🪑 ${lg} ${sa} : ${ok} matchs sur ${n} avec titulaires (${nt} joueurs)`);
+  indexer(sp, lg);
+  process.exit(0);
 }
 const PEL = process.env.PE_LIGUE || '';
 if (PEL) {
